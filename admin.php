@@ -1,0 +1,99 @@
+<?php
+/** DokuWiki Group Manager administration page. @license GPL-2.0-or-later */
+use dokuwiki\Extension\AdminPlugin;
+
+class admin_plugin_groupmanager extends AdminPlugin
+{
+    public function getMenuSort(): int
+    {
+        return 3;
+    }
+
+    public function forAdminOnly(): bool
+    {
+        return true;
+    }
+
+    public function html()
+    {
+        if (!auth_isadmin()) {
+            echo '<p class="error">Only DokuWiki superusers can use Group Manager.</p>';
+            return;
+        }
+        global $ID;
+        $classic = hsc(wl($ID, ['do' => 'admin', 'page' => 'usermanager']));
+        $token = hsc(getSecurityToken());
+        $ajax = hsc(DOKU_BASE . 'lib/exe/ajax.php');
+        echo '<div id="rmsgm" class="rmsgm" data-ajax="' . $ajax . '" data-token="' . $token . '">';
+        echo '<div class="rmsgm-header"><div class="rmsgm-heading"><h2>Group Manager</h2><div class="rmsgm-header-actions"><a class="btn btn-default" href="' . $classic . '">Classic User Manager</a><button type="button" class="btn btn-primary" id="rmsgm-new-open">New User</button></div></div><span class="rmsgm-subtitle">Manage user and group memberships, onboarding roles and new accounts.</span></div>';
+        echo '<div class="rmsgm-alert" role="status" aria-live="polite" hidden></div>';
+        echo '<div class="rmsgm-unsupported" hidden></div>';
+        echo '<div class="rmsgm-tabs" role="tablist">';
+        echo '<button type="button" class="rmsgm-tab active" data-tab="user" aria-selected="true">By User</button>';
+        echo '<button type="button" class="rmsgm-tab" data-tab="group" aria-selected="false">By Group</button>';
+        echo '</div>';
+        echo '<section class="rmsgm-panel" data-panel="user">';
+        echo '<div class="rmsgm-columns"><div class="rmsgm-card">';
+        echo '<h3>Find user</h3><label for="rmsgm-user-search">Search full name or username</label>';
+        echo '<input id="rmsgm-user-search" class="form-control" type="search" autocomplete="off" placeholder="Search users...">';
+        echo '<select id="rmsgm-user" class="form-control rmsgm-list" size="10" aria-label="Choose user"></select>';
+        echo '</div><div class="rmsgm-card">';
+        echo '<h3 id="rmsgm-user-title">Select a user</h3><div id="rmsgm-user-current" class="rmsgm-chips"></div>';
+        echo '<div class="rmsgm-template-apply"><label for="rmsgm-apply-template">Add groups from role template</label>';
+        echo '<div class="rmsgm-inline"><select id="rmsgm-apply-template" class="form-control"></select><button type="button" class="btn btn-default" id="rmsgm-apply">Add Groups</button></div>';
+        echo '<div id="rmsgm-compare" class="rmsgm-note" aria-live="polite"></div></div>';
+        echo '<label for="rmsgm-user-group-search">Filter available groups</label>';
+        echo '<input id="rmsgm-user-group-search" class="form-control" type="search" placeholder="Filter groups...">';
+        echo '<div id="rmsgm-user-checkboxes" class="rmsgm-checkgrid"></div>';
+        echo '<div id="rmsgm-user-preview" class="rmsgm-preview"></div>';
+        echo '<label class="rmsgm-override-label"><input type="checkbox" id="rmsgm-user-override"> Temporarily unlock privileged changes for this save</label>';
+        echo '<div class="rmsgm-buttons"><button id="rmsgm-user-reset" type="button" class="btn btn-default">Reset</button>';
+        echo '<button id="rmsgm-user-save" type="button" class="btn btn-primary">Preview &amp; Save</button></div>';
+        echo '</div></div>';
+        echo '<details class="rmsgm-template-manager rmsgm-card" id="rmsgm-template-details"><summary><strong>Manage role templates</strong> <small>(reusable group selections; never automatic ACL changes)</small></summary>';
+        echo '<div class="rmsgm-template-form"><label for="rmsgm-template-list">Template</label><select id="rmsgm-template-list" class="form-control"></select>';
+        echo '<label for="rmsgm-template-name">Template name</label><input type="text" id="rmsgm-template-name" class="form-control" maxlength="80" placeholder="e.g. Stores Clerk">';
+        echo '<p class="rmsgm-note">Templates may only contain ordinary groups. Assignments are add-only; existing memberships are not removed.</p>';
+        echo '<div id="rmsgm-template-groups" class="rmsgm-checkgrid"></div>';
+        echo '<div class="rmsgm-buttons"><button id="rmsgm-template-delete" type="button" class="btn btn-default">Delete template</button>';
+        echo '<button id="rmsgm-template-save" type="button" class="btn btn-primary">Save template</button></div></div></details></section>';
+        echo '<section class="rmsgm-panel" data-panel="group" hidden>';
+        echo '<div class="rmsgm-columns"><div class="rmsgm-card">';
+        echo '<h3>Groups <span id="rmsgm-group-count" class="rmsgm-muted"></span></h3>';
+        echo '<label for="rmsgm-group-search">Search groups</label>';
+        echo '<input id="rmsgm-group-search" class="form-control" type="search" placeholder="Filter groups...">';
+        echo '<select id="rmsgm-group" class="form-control rmsgm-list" size="10" aria-label="Choose group"></select>';
+        echo '<div class="rmsgm-create"><label for="rmsgm-new-group">Create / preserve group name</label>';
+        echo '<div class="rmsgm-inline"><input id="rmsgm-new-group" class="form-control" placeholder="e.g. engineering" autocomplete="off">';
+        echo '<button id="rmsgm-create" type="button" class="btn btn-default">Create</button></div></div>';
+        echo '<p class="rmsgm-note">Empty groups remain available in this plugin registry. Creating a name does not modify ACL rules.</p>';
+        echo '</div><div class="rmsgm-card">';
+        echo '<h3 id="rmsgm-group-title">Select a group</h3>';
+        echo '<p id="rmsgm-group-detail" class="rmsgm-muted"></p>';
+        echo '<label for="rmsgm-member-search">Search users</label>';
+        echo '<input id="rmsgm-member-search" class="form-control" type="search" placeholder="Find members or other users...">';
+        echo '<div class="rmsgm-inline"><button id="rmsgm-select-visible" class="btn btn-default btn-sm" type="button">Add visible</button>';
+        echo '<button id="rmsgm-clear-visible" class="btn btn-default btn-sm" type="button">Remove visible</button></div>';
+        echo '<div id="rmsgm-members" class="rmsgm-members"></div>';
+        echo '<div id="rmsgm-group-preview" class="rmsgm-preview"></div>';
+        echo '<label class="rmsgm-override-label"><input type="checkbox" id="rmsgm-group-override"> Temporarily unlock privileged changes for this save</label>';
+        echo '<div class="rmsgm-buttons"><button id="rmsgm-forget" type="button" class="btn btn-default">Forget empty group</button>';
+        echo '<span class="rmsgm-fill"></span><button id="rmsgm-group-reset" type="button" class="btn btn-default">Reset</button>';
+        echo '<button id="rmsgm-group-save" type="button" class="btn btn-primary">Preview &amp; Save</button></div>';
+        echo '</div></div></section>';
+        echo '<section class="rmsgm-panel" data-panel="new" hidden><div class="rmsgm-card rmsgm-new-user">';
+        echo '<div class="rmsgm-heading"><h3>New DokuWiki user</h3><button type="button" class="btn btn-default" id="rmsgm-new-close">Return to Group Manager</button></div>';
+        echo '<p class="rmsgm-note">Local account creation only. Requires backend addUser + modGroups capabilities. Never creates a Microsoft 365 account.</p>';
+        echo '<div class="rmsgm-form-grid"><div><label for="rmsgm-new-name">Full name</label><input class="form-control" id="rmsgm-new-name" maxlength="150" autocomplete="off"></div>';
+        echo '<div><label for="rmsgm-new-username">Username</label><input class="form-control" id="rmsgm-new-username" maxlength="64" placeholder="e.g. jane.smith" autocomplete="off"></div>';
+        echo '<div><label for="rmsgm-new-email">Email address</label><input class="form-control" type="email" id="rmsgm-new-email" maxlength="254" autocomplete="off"></div>';
+        echo '<div><label for="rmsgm-new-template">Role template (optional)</label><select class="form-control" id="rmsgm-new-template"></select></div></div>';
+        echo '<p class="rmsgm-note">Select a template to add its groups, then adjust individual memberships. Privileged groups cannot be assigned during account creation.</p>';
+        echo '<div id="rmsgm-new-groups" class="rmsgm-checkgrid"></div><div id="rmsgm-new-preview" class="rmsgm-preview"></div>';
+        echo '<div class="rmsgm-buttons"><button type="button" class="btn btn-default" id="rmsgm-new-reset">Reset</button>';
+        echo '<button type="button" class="btn btn-primary" id="rmsgm-new-create">Preview &amp; Create User</button></div>';
+        echo '<div id="rmsgm-new-credential" class="rmsgm-credential" hidden></div></div></section>';
+        echo '<p class="rmsgm-footnote">Temporary override applies to one save only. This tool never changes ACL rules or permissions granted by a role template itself.</p>';
+        echo '</div>';
+    }
+}

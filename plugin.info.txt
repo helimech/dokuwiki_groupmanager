@@ -1,0 +1,7 @@
+base   groupmanager
+author Rotor Maxx Support Limited
+email  
+date   2026-10-20
+name   Group Manager
+desc   Visual user/group editing, templates and onboarding with group registry and audit.
+url    https://github.com/helimech/dokuwiki_groupmanager
