@@ -93,3 +93,32 @@
 #rmsgm #rmsgm-new-password-mode { max-width:440px; }
 #rmsgm #rmsgm-new-password-reveal { margin-top:9px; }
 #rmsgm input.rmsgm-temp-pass { display:block; width:100%; max-width:350px; box-sizing:border-box; font-family:monospace; cursor:text; user-select:text; margin:12px 0; }
+
+
+/* v0.4.0-alpha: ACL Access Audit (read-only). */
+#rmsgm .rmsgm-audit-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+#rmsgm .rmsgm-audit-header h3 { margin-bottom:5px; }
+#rmsgm .rmsgm-audit-header small { font-size:.65em; color:#667085; }
+#rmsgm .rmsgm-audit-header .rmsgm-note { margin:0; max-width:780px; }
+#rmsgm .rmsgm-audit-totals { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:14px 0; }
+#rmsgm .rmsgm-audit-stat { border:1px solid #d8dee5; border-radius:5px; padding:12px; display:flex; flex-direction:column; }
+#rmsgm .rmsgm-audit-stat strong { font-size:1.5em; line-height:1.3; }
+#rmsgm .rmsgm-audit-stat span { color:#667085; }
+#rmsgm .rmsgm-audit-subtabs { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
+#rmsgm .rmsgm-audit-subtabs .active { background:#e9f3fc; border-color:#3977a9; font-weight:600; }
+#rmsgm .rmsgm-audit-section > input[type="search"] { width:100%; max-width:420px; margin-bottom:12px; }
+#rmsgm .rmsgm-audit-table-wrap { overflow-x:auto; width:100%; }
+#rmsgm .rmsgm-audit-table { width:100%; border-collapse:collapse; }
+#rmsgm .rmsgm-audit-table th, #rmsgm .rmsgm-audit-table td { padding:9px 11px; border-bottom:1px solid #e4e8ec; text-align:left; vertical-align:top; }
+#rmsgm .rmsgm-audit-table th { white-space:nowrap; background:rgba(127,127,127,.06); }
+#rmsgm .rmsgm-audit-table td { overflow-wrap:anywhere; }
+#rmsgm .rmsgm-audit-table td:nth-child(2), #rmsgm .rmsgm-audit-table td:nth-child(3) { font-variant-numeric:tabular-nums; }
+#rmsgm .rmsgm-audit-scope-list { margin-top:4px; font-size:.87em; }
+#rmsgm .rmsgm-audit-scope-list summary { cursor:pointer; color:#3977a9; }
+#rmsgm .rmsgm-audit-scope-list code { display:block; margin:5px 0; word-break:break-word; }
+#rmsgm .rmsgm-audit-finding { padding:12px 0; border-bottom:1px solid #e4e8ec; }
+#rmsgm .rmsgm-audit-finding-head { display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+#rmsgm .rmsgm-audit-severity { border:1px solid #d1d5db; border-radius:12px; padding:2px 9px; font-size:.85em; }
+#rmsgm .rmsgm-audit-severity.review { color:#925700; border-color:#e3bb70; }
+#rmsgm .rmsgm-audit-finding p { margin:7px 0 2px; }
+@media(max-width:700px) { #rmsgm .rmsgm-audit-table th, #rmsgm .rmsgm-audit-table td { padding:7px 6px; font-size:.88em; } }
