@@ -2,7 +2,19 @@
 
 A standalone administration plugin that lets superusers manage DokuWiki account/group memberships through searchable checkboxes, preserve empty group names, apply static onboarding role templates, and create local users through DokuWiki's supported authentication API. Independent of Rotor Maxx's `structdocapproval` plugin.
 
-**Release:** `0.2.0-alpha` — **test environments only; not production validated**.
+**Release:** `0.3.0-alpha` — **test environments only; not production validated**.
+
+## What's new in 0.3.0-alpha — Permissions Explorer (read-only)
+
+- **Permissions** tab with Group and User selectors; no ACL editing is available in v0.3.
+- Browse an expandable namespace/page tree, loaded a namespace at a time. Combine actual page/namespace locations, media namespaces and ACL references (including empty/deleted namespaces and pages that still have ACL entries).
+- Show effective **None / Read / Edit / Create / Upload / Delete / Superuser** permission levels from DokuWiki's own `auth_aclcheck()` function. The group view simulates membership in just the selected group plus `@ALL`. The user view reads all current memberships and direct user rules.
+- **Why this permission?** details show the scope responsible for access and matching rules from broader scopes, including when the more specific scope wins. Explain same-scope highest-permission precedence.
+- Handle DokuWiki's `%USER%` and `%GROUP%` ACL wildcards for the selected user/group rather than accidentally using the logged-in administrator's expansion. Restore the original `$AUTH_ACL` global after each check.
+- Optional **Only show explicit rules and their ancestors** filter, read-only Refresh, and link to Classic ACL Manager.
+- Superuser-only AJAX, existing POST + CSRF protection, no ACL writes. Tests added for scope inheritance, page-specific exceptions, wildcard expansion and preserving the live ACL global.
+
+**Important limitation:** Dynamic hooks attached to `AUTH_ACL_CHECK` can introduce rules beyond ordinary `acl.auth.php` evaluation. The explorer calls the hook-aware DokuWiki checker for the effective level and flags disagreements with its standard-rule explanation. A third-party plugin may inspect the real administrator's session instead of the simulated identity; verify those cases independently. This is a diagnostic viewer, not a security certification report.
 
 ## What's new in 0.2.0-alpha
 
@@ -24,10 +36,11 @@ A standalone administration plugin that lets superusers manage DokuWiki account/
 ## Installation
 
 1. Back up your **test** DokuWiki configuration, `conf/users.auth.php` and `data/meta` before installing or upgrading.
-2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.2.0-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
-3. If upgrading from v0.1, overwrite/upgrade the existing `groupmanager` extension using the Extension Manager workflow. Runtime `data/meta/groupmanager` data is preserved.
+2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.3.0-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
+3. If upgrading from v0.1 or v0.2, overwrite/upgrade the existing `groupmanager` extension using the Extension Manager workflow. Runtime `data/meta/groupmanager` data is preserved.
 4. Log in as a DokuWiki superuser and open **Admin → Group Manager**. Check backend support and user/group counts before making any edits.
-5. Begin testing with nonprivileged dummy users. In particular test privileged changes, template creation/application, and new-user creation before real use.
+5. Begin testing the read-only **Permissions** tab against the existing ACL Manager. Inspect a normal group, a user in several groups, a superuser, page-specific exceptions and orphaned namespace ACL entries. No permission edits are possible from this tab.
+6. Regression-test v0.2 membership editing, protected groups, templates and new-user creation with dummy accounts before real use.
 
 Designed for DokuWiki with Bootstrap3 and PHP 8.2. Files are installed as `/lib/plugins/groupmanager/`, regardless of the GitHub repository name.
 
@@ -66,20 +79,23 @@ These files are deliberately **not removed** by uninstalling the plugin; preserv
 - `admin.php`: admin UI (including reciprocal Classic User Manager link)
 - `action.php`: authenticated/CSRF-protected AJAX controller
 - `helper.php`: backend adapter, registry, templates, onboarding and audit
+- `inc/AclExplorer.php`: read-only ACL scope explorer, wildcard expansion, DokuWiki evaluation and matching-rule explanation
 - `script.js`: interactive UI and Classic User Manager link
 - `style.css`: scoped responsive Bootstrap3 styling
 - `lang/en/lang.php`, `admin.svg`, `plugin.info.txt`: plugin metadata
 - `tests/smoke.php`: CLI-only mock-backend tests (source ZIP/repo only)
+- `tests/acl_explorer.php`: CLI-only ACL-specific diagnostics tests (source ZIP/repo only)
 
 For local checks:
 
 ```bash
-php -l admin.php && php -l action.php && php -l helper.php
+php -l admin.php && php -l action.php && php -l helper.php && php -l inc/AclExplorer.php
 node --check script.js
 php tests/smoke.php
+php tests/acl_explorer.php
 ```
 
-The mock tests do **not** replace browser tests against your real DokuWiki release, permission configuration, email policy or PHP-FPM environment.
+The mock tests do **not** replace browser tests against your real DokuWiki release, permission configuration, ACL event extensions, email policy or PHP-FPM environment.
 
 ## License
 

@@ -22,6 +22,7 @@ class admin_plugin_groupmanager extends AdminPlugin
         }
         global $ID;
         $classic = hsc(wl($ID, ['do' => 'admin', 'page' => 'usermanager']));
+        $aclManager = hsc(wl($ID, ['do' => 'admin', 'page' => 'acl']));
         $token = hsc(getSecurityToken());
         $ajax = hsc(DOKU_BASE . 'lib/exe/ajax.php');
         echo '<div id="rmsgm" class="rmsgm" data-ajax="' . $ajax . '" data-token="' . $token . '">';
@@ -31,6 +32,7 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<div class="rmsgm-tabs" role="tablist">';
         echo '<button type="button" class="rmsgm-tab active" data-tab="user" aria-selected="true">By User</button>';
         echo '<button type="button" class="rmsgm-tab" data-tab="group" aria-selected="false">By Group</button>';
+        echo '<button type="button" class="rmsgm-tab" data-tab="acl" aria-selected="false">Permissions</button>';
         echo '</div>';
         echo '<section class="rmsgm-panel" data-panel="user">';
         echo '<div class="rmsgm-columns"><div class="rmsgm-card">';
@@ -81,6 +83,20 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<span class="rmsgm-fill"></span><button id="rmsgm-group-reset" type="button" class="btn btn-default">Reset</button>';
         echo '<button id="rmsgm-group-save" type="button" class="btn btn-primary">Preview &amp; Save</button></div>';
         echo '</div></div></section>';
+        echo '<section class="rmsgm-panel" data-panel="acl" hidden>';
+        echo '<div class="rmsgm-acl-toolbar rmsgm-card"><div class="rmsgm-acl-toolbar-group">';
+        echo '<label for="rmsgm-acl-type">Inspect permissions for</label><select class="form-control" id="rmsgm-acl-type"><option value="group">Group</option><option value="user">User</option></select>';
+        echo '<label for="rmsgm-acl-principal">Select group or user</label><select class="form-control" id="rmsgm-acl-principal"></select>';
+        echo '</div><div class="rmsgm-acl-toolbar-end"><label class="rmsgm-acl-filter"><input id="rmsgm-acl-explicit" type="checkbox"> Only show explicit rules and their ancestors</label>';
+        echo '<button id="rmsgm-acl-refresh" type="button" class="btn btn-default">Refresh tree</button>';
+        echo '<a class="btn btn-default" href="' . $aclManager . '">Classic ACL Manager</a></div></div>';
+        echo '<p class="rmsgm-note">Read-only permission inspection. Group view simulates the selected group plus @ALL. User view evaluates current group memberships and user-specific rules. No ACL entries are changed.</p>';
+        echo '<div class="rmsgm-acl-columns"><div class="rmsgm-card"><h3>Namespaces and pages</h3>';
+        echo '<p class="rmsgm-acl-hint">Expand namespaces to browse. Select any row to see which rules determine its access.</p>';
+        echo '<div id="rmsgm-acl-tree" class="rmsgm-acl-tree" aria-label="ACL namespace tree"></div>';
+        echo '<div id="rmsgm-acl-tree-status" class="rmsgm-muted" role="status"></div></div>';
+        echo '<div class="rmsgm-card"><h3>Why this permission?</h3><div id="rmsgm-acl-detail" class="rmsgm-acl-detail" aria-live="polite">Select a page or namespace in the tree.</div></div></div>';
+        echo '</section>';
         echo '<section class="rmsgm-panel" data-panel="new" hidden><div class="rmsgm-card rmsgm-new-user">';
         echo '<div class="rmsgm-heading"><h3>New DokuWiki user</h3><button type="button" class="btn btn-default" id="rmsgm-new-close">Return to Group Manager</button></div>';
         echo '<p class="rmsgm-note">Local account creation only. Requires backend addUser + modGroups capabilities. Never creates a Microsoft 365 account.</p>';
@@ -93,7 +109,7 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<div class="rmsgm-buttons"><button type="button" class="btn btn-default" id="rmsgm-new-reset">Reset</button>';
         echo '<button type="button" class="btn btn-primary" id="rmsgm-new-create">Preview &amp; Create User</button></div>';
         echo '<div id="rmsgm-new-credential" class="rmsgm-credential" hidden></div></div></section>';
-        echo '<p class="rmsgm-footnote">Temporary override applies to one save only. This tool never changes ACL rules or permissions granted by a role template itself.</p>';
+        echo '<p class="rmsgm-footnote">Temporary override applies to one save only. Membership management does not edit ACL rules. The Permissions Explorer is read-only.</p>';
         echo '</div>';
     }
 }

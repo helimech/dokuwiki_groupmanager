@@ -67,6 +67,28 @@ class action_plugin_groupmanager extends ActionPlugin
                     if (!is_array($groups) || !array_is_list($groups)) throw new InvalidArgumentException('Invalid membership list.');
                     $result = $helper->createUser($INPUT->str('username'), $INPUT->str('name'), $INPUT->str('email'), $groups);
                     break;
+                case 'aclTree':
+                case 'aclExplain':
+                    global $auth, $conf;
+                    if (!($auth instanceof \dokuwiki\Extension\AuthPlugin) || empty($conf['useacl'])) {
+                        throw new RuntimeException('DokuWiki ACLs are disabled or authentication is unavailable.');
+                    }
+                    $kind = $INPUT->str('principalType');
+                    $principal = $INPUT->str('principal');
+                    if ($kind === 'group') {
+                        $directory = $helper->directoryData();
+                        if (!in_array($principal, array_column($directory['groups'] ?? [], 'name'), true)) {
+                            throw new InvalidArgumentException('Select a group from the Group Manager directory.');
+                        }
+                    }
+                    require_once __DIR__ . '/inc/AclExplorer.php';
+                    $explorer = new \dokuwiki\plugin\groupmanager\AclExplorer($auth);
+                    if ($action === 'aclTree') {
+                        $result = $explorer->tree($kind, $principal, $INPUT->str('parent'));
+                    } else {
+                        $result = $explorer->explain($kind, $principal, $INPUT->str('node'), $INPUT->str('nodeType'));
+                    }
+                    break;
                 case 'createGroup':
                     $result = $helper->createGroup($INPUT->str('name'));
                     break;

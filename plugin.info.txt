@@ -1,7 +1,7 @@
 base   groupmanager
 author Rotor Maxx Support Limited
 email  
-date   2026-10-20
+date   2026-10-21
 name   Group Manager
-desc   Visual user/group editing, templates and onboarding with group registry and audit.
+desc   Visual users/groups, onboarding, permission exploration and audit.
 url    https://github.com/helimech/dokuwiki_groupmanager

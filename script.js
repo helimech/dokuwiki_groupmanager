@@ -1,4 +1,4 @@
-/* DokuWiki Group Manager v0.2.0-alpha. No external JavaScript dependencies. */
+/* DokuWiki Group Manager v0.3.0-alpha. No external JavaScript dependencies. */
 (function () {
     'use strict';
 
@@ -47,7 +47,10 @@
             newOpen: $('#rmsgm-new-open'), newClose: $('#rmsgm-new-close'),
             newName: $('#rmsgm-new-name'), newUsername: $('#rmsgm-new-username'), newEmail: $('#rmsgm-new-email'),
             newTemplate: $('#rmsgm-new-template'), newGroups: $('#rmsgm-new-groups'), newPreview: $('#rmsgm-new-preview'),
-            newReset: $('#rmsgm-new-reset'), newCreate: $('#rmsgm-new-create'), newCredential: $('#rmsgm-new-credential')
+            newReset: $('#rmsgm-new-reset'), newCreate: $('#rmsgm-new-create'), newCredential: $('#rmsgm-new-credential'),
+            aclType: $('#rmsgm-acl-type'), aclPrincipal: $('#rmsgm-acl-principal'),
+            aclExplicit: $('#rmsgm-acl-explicit'), aclRefresh: $('#rmsgm-acl-refresh'),
+            aclTree: $('#rmsgm-acl-tree'), aclDetail: $('#rmsgm-acl-detail'), aclTreeStatus: $('#rmsgm-acl-tree-status')
         };
         const node = (tag, cls, text) => {
             const el = document.createElement(tag);
@@ -338,6 +341,7 @@
                 el.classList.toggle('active', selected);
                 el.setAttribute('aria-selected', selected ? 'true' : 'false');
             });
+            if (panel === 'acl') aclRefresh();
         }
         async function save(edits, override) {
             if (!edits.length) return;
@@ -370,6 +374,166 @@
             e.newCredential.hidden = true; clear(e.newCredential);
             renderNewUser();
         }
+        // Read-only ACL explorer. Every view is retrieved from DokuWiki, never saved here.
+        const acl = { epoch: 0, loaded: false, type: 'group', principal: '' };
+        function aclPrincipalOptions() {
+            if (!state.directory) return;
+            const previous = e.aclPrincipal.value || acl.principal;
+            const kind = e.aclType.value;
+            const entries = kind === 'user' ? state.directory.users : state.directory.groups;
+            clear(e.aclPrincipal);
+            entries.forEach((item) => {
+                const id = kind === 'user' ? item.id : item.name;
+                const label = kind === 'user' ? item.name + ' (' + item.id + ')' : item.name + ' (' + item.count + ')';
+                const opt = node('option', '', label); opt.value = id;
+                e.aclPrincipal.appendChild(opt);
+            });
+            const preferred = kind === 'user' ? state.user :
+                (state.directory.groups.find((g) => g.name === 'staff')?.name ||
+                    state.directory.groups.find((g) => !g.protected)?.name || state.group);
+            const chosen = entries.some((item) => (kind === 'user' ? item.id : item.name) === previous) ? previous : preferred;
+            if (entries.some((item) => (kind === 'user' ? item.id : item.name) === chosen)) e.aclPrincipal.value = chosen;
+            acl.type = kind; acl.principal = e.aclPrincipal.value;
+        }
+        function aclParams() {
+            return { principalType: e.aclType.value, principal: e.aclPrincipal.value };
+        }
+        function aclMessage(content) {
+            clear(e.aclDetail);
+            e.aclDetail.appendChild(node('p', 'rmsgm-note', content));
+        }
+        function aclExplain(id, type, epoch) {
+            if (epoch !== acl.epoch) return;
+            aclMessage('Loading matching ACL rules…');
+            request('aclExplain', { ...aclParams(), node: id, nodeType: type }).then((data) => {
+                if (epoch !== acl.epoch) return;
+                clear(e.aclDetail);
+                e.aclDetail.appendChild(node('h4', '', data.scope));
+                const summary = node('p', 'rmsgm-acl-summary');
+                summary.appendChild(node('strong', '', data.permissionLabel));
+                summary.appendChild(document.createTextNode(' — ' +
+                    (data.sourceType === 'superuser' ? 'DokuWiki superuser' :
+                        data.sourceType === 'adjusted' ? 'ACL plugin adjustment' :
+                        data.sourceType === 'none' ? 'No matching ACL rule' :
+                        data.sourceType === 'explicit' ? 'Explicit matching rule' : 'Inherited rule')));
+                e.aclDetail.appendChild(summary);
+                if (data.sourceScope) e.aclDetail.appendChild(node('p', 'rmsgm-muted', 'Determining source: ' + data.sourceScope));
+                if (data.subject.kind === 'user') {
+                    e.aclDetail.appendChild(node('p', 'rmsgm-muted',
+                        'Groups of ' + data.subject.user + ': ' + (data.subject.groups.join(', ') || '(none)')));
+                } else {
+                    e.aclDetail.appendChild(node('p', 'rmsgm-muted',
+                        'Simulation includes @' + data.subject.name + ' and @ALL only; actual users may belong to additional groups.'));
+                }
+                if (data.note) e.aclDetail.appendChild(node('p', 'rmsgm-acl-caution', data.note));
+                if (data.sourceType === 'superuser') {
+                    e.aclDetail.appendChild(node('p', '',
+                        'Superusers bypass ordinary ACL rules. Membership changes in a privileged group may affect this status.'));
+                }
+                if (!data.matchingRules.length) {
+                    e.aclDetail.appendChild(node('p', 'rmsgm-muted', 'No matching explicit ACL entries at this page or its ancestor scopes.'));
+                    return;
+                }
+                e.aclDetail.appendChild(node('h5', '', 'Matching ACL entries (most specific first)'));
+                data.matchingRules.forEach((scope) => {
+                    const block = node('div', 'rmsgm-acl-source');
+                    block.appendChild(node('strong', '', scope.scope + (scope.selected ? ' — governing scope' : ' — overridden by a more specific scope')));
+                    scope.rules.forEach((rule) => {
+                        const ruleRow = node('div', 'rmsgm-acl-source-row' + (scope.selected && rule.winning ? ' rmsgm-acl-winner' : ''));
+                        ruleRow.appendChild(node('code', '', decodeURIComponentSafe(rule.principal)));
+                        ruleRow.appendChild(node('span', '', ' → ' + aclLevelName(rule.level)));
+                        if (scope.selected && rule.winning) ruleRow.appendChild(node('strong', '', ' Governing permission'));
+                        block.appendChild(ruleRow);
+                    });
+                    e.aclDetail.appendChild(block);
+                });
+                e.aclDetail.appendChild(node('p', 'rmsgm-note',
+                    'DokuWiki uses the most specific matching scope, then the highest permission among matching rules at that scope.'));
+            }).catch((ex) => { if (epoch === acl.epoch) aclMessage('Unable to explain permissions: ' + ex.message); });
+        }
+        function decodeURIComponentSafe(text) {
+            try { return decodeURIComponent(text); } catch (e) { return text; }
+        }
+        function aclLevelName(n) {
+            return ({ 0: 'None', 1: 'Read', 2: 'Edit', 4: 'Create', 8: 'Upload', 16: 'Delete', 255: 'Superuser' })[n] || 'Level ' + n;
+        }
+        async function aclLoadChildren(parent, container, epoch) {
+            const response = await request('aclTree', { ...aclParams(), parent });
+            if (epoch !== acl.epoch) return;
+            clear(container);
+            const filtered = response.nodes.filter((entry) => !e.aclExplicit.checked ||
+                entry.explicitRule || entry.hasExplicitBelow);
+            if (!filtered.length) {
+                container.appendChild(node('p', 'rmsgm-acl-empty', e.aclExplicit.checked ?
+                    'No directly matching ACL rules below this namespace.' : 'No pages or subnamespaces here.'));
+            }
+            filtered.forEach((entry) => {
+                const wrap = node('div', 'rmsgm-acl-item');
+                const row = node('div', 'rmsgm-acl-row');
+                const expand = node('button', 'rmsgm-acl-expand', entry.hasChildren ? '▸' : '');
+                expand.type = 'button'; expand.disabled = !entry.hasChildren;
+                expand.setAttribute('aria-label', 'Expand ' + entry.name);
+                expand.setAttribute('aria-expanded', 'false');
+                const select = node('button', 'rmsgm-acl-select', (entry.hasChildren ? '📁 ' : '📄 ') + entry.name);
+                select.type = 'button'; select.title = entry.id + (entry.onDisk ? '' : ' (ACL reference; no current page/directory)');
+                const value = node('span', 'rmsgm-acl-level', entry.permissionLabel);
+                const source = node('span', 'rmsgm-acl-origin', entry.sourceType === 'explicit' ? 'Explicit' :
+                    entry.sourceType === 'inherited' ? 'Inherited' :
+                    entry.sourceType === 'superuser' ? 'Superuser' :
+                    entry.sourceType === 'adjusted' ? 'Hook' : 'None');
+                row.append(expand, select, value, source);
+                const children = node('div', 'rmsgm-acl-children'); children.hidden = true;
+                select.addEventListener('click', () => {
+                    e.aclTree.querySelectorAll('.rmsgm-acl-row').forEach((r) => r.classList.remove('rmsgm-acl-selected'));
+                    row.classList.add('rmsgm-acl-selected');
+                    aclExplain(entry.id, entry.type, epoch);
+                });
+                expand.addEventListener('click', async () => {
+                    if (!entry.hasChildren) return;
+                    if (!children.hidden) { children.hidden = true; expand.textContent = '▸'; expand.setAttribute('aria-expanded', 'false'); return; }
+                    children.hidden = false; expand.textContent = '▾'; expand.setAttribute('aria-expanded', 'true');
+                    if (children.dataset.loaded === '1') return;
+                    expand.disabled = true; children.appendChild(node('p', 'rmsgm-acl-empty', 'Loading…'));
+                    try { await aclLoadChildren(entry.id, children, epoch); if (epoch === acl.epoch) children.dataset.loaded = '1'; }
+                    catch (ex) { if (epoch === acl.epoch) { clear(children); children.appendChild(node('p', 'rmsgm-acl-caution', ex.message)); } }
+                    finally { expand.disabled = false; }
+                });
+                wrap.append(row, children); container.appendChild(wrap);
+            });
+            if (parent === '') e.aclTreeStatus.textContent = 'Showing ' + filtered.length +
+                ' root entries.' + (response.dynamicRuleCount ? ' ' + response.dynamicRuleCount + ' dynamic ACL rules resolved for this selection.' : '');
+        }
+        function aclRefresh() {
+            if (!state.directory || state.active !== 'acl') return;
+            aclPrincipalOptions();
+            acl.epoch += 1;
+            const epoch = acl.epoch;
+            clear(e.aclTree);
+            e.aclTreeStatus.textContent = '';
+            if (!e.aclPrincipal.value) { aclMessage('No user or group is available.'); return; }
+            aclMessage('Select a page or namespace to inspect its effective permissions.');
+            const rootRow = node('div', 'rmsgm-acl-row rmsgm-acl-root');
+            const rootButton = node('button', 'rmsgm-acl-select', '⌂ Wiki root (*)');
+            rootButton.type = 'button';
+            rootButton.addEventListener('click', () => {
+                e.aclTree.querySelectorAll('.rmsgm-acl-row').forEach((r) => r.classList.remove('rmsgm-acl-selected'));
+                rootRow.classList.add('rmsgm-acl-selected');
+                aclExplain('', 'root', epoch);
+            });
+            rootRow.appendChild(rootButton);
+            e.aclTree.appendChild(rootRow);
+            const children = node('div', 'rmsgm-acl-children'); e.aclTree.appendChild(children);
+            children.appendChild(node('p', 'rmsgm-acl-empty', 'Loading namespaces…'));
+            aclLoadChildren('', children, epoch).catch((ex) => {
+                if (epoch !== acl.epoch) return;
+                clear(children); e.aclTreeStatus.textContent = 'Unable to load ACL tree: ' + ex.message;
+            });
+        }
+        e.aclType.addEventListener('change', () => { acl.principal = ''; aclRefresh(); });
+        e.aclPrincipal.addEventListener('change', () => { acl.principal = e.aclPrincipal.value; aclRefresh(); });
+        e.aclExplicit.addEventListener('change', aclRefresh);
+        e.aclRefresh.addEventListener('click', aclRefresh);
+
         root.querySelectorAll('[data-tab]').forEach((tab) => tab.addEventListener('click', () => {
             if (state.active !== tab.dataset.tab && !confirmDiscard()) return;
             resetDrafts(); switchPanel(tab.dataset.tab); renderUser(); renderGroup();
