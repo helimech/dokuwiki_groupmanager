@@ -33,6 +33,7 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<button type="button" class="rmsgm-tab active" data-tab="user" aria-selected="true">By User</button>';
         echo '<button type="button" class="rmsgm-tab" data-tab="group" aria-selected="false">By Group</button>';
         echo '<button type="button" class="rmsgm-tab" data-tab="acl" aria-selected="false">Permissions</button>';
+        echo '<button type="button" class="rmsgm-tab" data-tab="audit" aria-selected="false">Access Audit</button>';
         echo '</div>';
         echo '<section class="rmsgm-panel" data-panel="user">';
         echo '<div class="rmsgm-columns"><div class="rmsgm-card">';
@@ -97,6 +98,15 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<div id="rmsgm-acl-tree-status" class="rmsgm-muted" role="status"></div></div>';
         echo '<div class="rmsgm-card"><h3>Why this permission?</h3><div id="rmsgm-acl-detail" class="rmsgm-acl-detail" aria-live="polite">Select a page or namespace in the tree.</div></div></div>';
         echo '</section>';
+        echo '<section class="rmsgm-panel" data-panel="audit" hidden>';
+        echo '<div class="rmsgm-card rmsgm-audit-header"><div><h3>Access Audit <small>(read-only)</small></h3><p class="rmsgm-note">Review ACL rules and group references. Findings are not deletion recommendations. Workflow roles can be used by plugins without ACL rules.</p></div><button type="button" class="btn btn-default" id="rmsgm-audit-refresh">Refresh audit</button></div>';
+        echo '<p id="rmsgm-audit-status" class="rmsgm-muted" role="status"></p>';
+        echo '<div id="rmsgm-audit-totals" class="rmsgm-audit-totals"></div>';
+        echo '<div class="rmsgm-audit-subtabs" role="tablist" aria-label="Access audit sections"><button type="button" class="btn btn-default active" data-audit-view="groups">Groups</button><button type="button" class="btn btn-default" data-audit-view="roots">Namespaces &amp; pages</button><button type="button" class="btn btn-default" data-audit-view="findings">Diagnostics</button></div>';
+        echo '<div class="rmsgm-card rmsgm-audit-section" data-audit-panel="groups"><h3>Group usage</h3><p class="rmsgm-note">An empty ACL group can be intentional (e.g. reserved contractors). No groups are removed.</p><label for="rmsgm-audit-group-filter">Filter groups</label><input type="search" class="form-control" id="rmsgm-audit-group-filter" placeholder="Name or status..."><div id="rmsgm-audit-groups"></div></div>';
+        echo '<div class="rmsgm-card rmsgm-audit-section" data-audit-panel="roots" hidden><h3>Root namespaces &amp; pages</h3><p class="rmsgm-note">Rule counts are not effective permissions; ACL-only entries may be virtual, planned or retired.</p><label for="rmsgm-audit-root-filter">Filter entries</label><input type="search" class="form-control" id="rmsgm-audit-root-filter" placeholder="Namespace or page..."><div id="rmsgm-audit-roots"></div></div>';
+        echo '<div class="rmsgm-card rmsgm-audit-section" data-audit-panel="findings" hidden><h3>Diagnostics</h3><p class="rmsgm-note">Check business purpose and effective access before changing any rule. No automated cleanup.</p><label for="rmsgm-audit-finding-filter">Filter findings</label><input type="search" class="form-control" id="rmsgm-audit-finding-filter" placeholder="Type, rule or scope..."><div id="rmsgm-audit-findings"></div></div>';
+        echo '</section>';
         echo '<section class="rmsgm-panel" data-panel="new" hidden><div class="rmsgm-card rmsgm-new-user">';
         echo '<div class="rmsgm-heading"><h3>New DokuWiki user</h3><button type="button" class="btn btn-default" id="rmsgm-new-close">Return to Group Manager</button></div>';
         echo '<p class="rmsgm-note">Local account creation only. Requires backend addUser + modGroups capabilities. Never creates a Microsoft 365 account.</p>';
@@ -117,7 +127,8 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<div class="rmsgm-buttons"><button type="button" class="btn btn-default" id="rmsgm-new-reset">Reset</button>';
         echo '<button type="button" class="btn btn-primary" id="rmsgm-new-create">Preview &amp; Create User</button></div>';
         echo '<div id="rmsgm-new-credential" class="rmsgm-credential" hidden></div></div></section>';
-        echo '<p class="rmsgm-footnote">Temporary override applies to one save only. Membership management does not edit ACL rules. The Permissions Explorer is read-only.</p>';
+        echo '<p class="rmsgm-footnote">Temporary override applies to one save only. Membership management does not edit ACL rules. Permissions Explorer and Access Audit are read-only.</p>';
+        echo '<script defer src="' . hsc(DOKU_BASE . 'lib/plugins/groupmanager/audit.js?v=0.4.0') . '"></script>';
         echo '</div>';
     }
 }
