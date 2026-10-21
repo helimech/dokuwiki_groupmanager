@@ -86,3 +86,10 @@
 #rmsgm .rmsgm-acl-detail h4 { overflow-wrap:anywhere; }
 @media (max-width:950px) { #rmsgm .rmsgm-acl-columns { grid-template-columns:1fr; } }
 @media (max-width:620px) { #rmsgm .rmsgm-acl-toolbar-group { grid-template-columns:1fr; width:100%; } #rmsgm .rmsgm-acl-level { flex-basis:54px; } #rmsgm .rmsgm-acl-origin { flex-basis:60px; } }
+
+/* v0.3.1: optional administrator-chosen onboarding password and HTTP-safe copy fallback. */
+#rmsgm .rmsgm-password-section { border:1px solid #e1e6eb; border-radius:5px; padding:12px 16px; margin:16px 0; }
+#rmsgm .rmsgm-password-section h4 { margin:0 0 8px; }
+#rmsgm #rmsgm-new-password-mode { max-width:440px; }
+#rmsgm #rmsgm-new-password-reveal { margin-top:9px; }
+#rmsgm input.rmsgm-temp-pass { display:block; width:min(100%, 350px); font-family:monospace; cursor:text; user-select:text; margin:12px 0; }

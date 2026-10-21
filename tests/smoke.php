@@ -84,10 +84,22 @@ namespace {
     $blocked = $h->saveMemberships([['user'=>'mary','before'=>['admin','qa','staff'],'after'=>['qa','staff']]], true);
     check($blocked['changed'] === 0 && str_contains($blocked['results'][0]['message'], 'last effective'), 'last superuser removal allowed');
     $created = $h->createUser('newperson', 'New Person', 'new@example.com', ['wip']);
-    check(strlen($created['temporaryPassword']) === 32 && in_array('staff',$auth->users['newperson']['grps'],true), 'create user password or default group missing');
+    check(strlen($created['temporaryPassword']) === 16 && in_array('staff',$auth->users['newperson']['grps'],true), 'create user password or default group missing');
     check($h->directoryData()['canCreate'] === true, 'canCreate not advertised');
     $registryContents = file_get_contents($folder . '/meta/groupmanager/audit.jsonl');
     check(!str_contains($registryContents, $created['temporaryPassword']), 'password leaked to audit');
+    $custom = 'MyLocalPass-42!';
+    $manual = $h->createUser('manualuser', 'Manual Person', 'manual@example.com', ['staff'], 'manual', $custom, $custom);
+    check($manual['passwordMode'] === 'manual' && !isset($manual['temporaryPassword']), 'manual password leaked in the response');
+    check($auth->users['manualuser']['pass'] === 'hash:' . hash('sha256', $custom), 'manual password was not passed to auth backend');
+    check(!str_contains(file_get_contents($folder . '/meta/groupmanager/audit.jsonl'), $custom), 'manual password leaked to audit');
+    try { $h->createUser('badpass', 'Bad Password', 'badpass@example.com', ['staff'], 'manual', 'short', 'short'); throw new \RuntimeException('weak password accepted'); }
+    catch (\InvalidArgumentException $expected) {}
+    try { $h->createUser('badmatch', 'Bad Match', 'badmatch@example.com', ['staff'], 'manual', $custom, 'different42'); throw new \RuntimeException('mismatched password accepted'); }
+    catch (\InvalidArgumentException $expected) {}
+    try { $h->createUser('badmode', 'Bad Mode', 'badmode@example.com', ['staff'], 'wrong'); throw new \RuntimeException('unknown mode accepted'); }
+    catch (\InvalidArgumentException $expected) {}
+
     try { $h->createUser('newperson', 'New Person', 'new@example.com', ['staff']); throw new \RuntimeException('duplicate user allowed'); }
     catch (\RuntimeException $expected) {check(str_contains($expected->getMessage(), 'exists'), 'wrong duplicate error');}
     try { $h->createUser('newadmin', 'New Admin', 'admin@example.com', ['admin']); throw new \RuntimeException('privileged onboarding allowed'); }

@@ -65,7 +65,10 @@ class action_plugin_groupmanager extends ActionPlugin
                 case 'createUser':
                     $groups = json_decode($INPUT->str('groups'), true, 512, JSON_THROW_ON_ERROR);
                     if (!is_array($groups) || !array_is_list($groups)) throw new InvalidArgumentException('Invalid membership list.');
-                    $result = $helper->createUser($INPUT->str('username'), $INPUT->str('name'), $INPUT->str('email'), $groups);
+                    $result = $helper->createUser(
+                        $INPUT->str('username'), $INPUT->str('name'), $INPUT->str('email'), $groups,
+                        $INPUT->str('password_mode', 'generate'), $INPUT->str('password'), $INPUT->str('password_confirm')
+                    );
                     break;
                 case 'aclTree':
                 case 'aclExplain':

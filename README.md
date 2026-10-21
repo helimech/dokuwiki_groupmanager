@@ -2,7 +2,14 @@
 
 A standalone administration plugin that lets superusers manage DokuWiki account/group memberships through searchable checkboxes, preserve empty group names, apply static onboarding role templates, and create local users through DokuWiki's supported authentication API. Independent of Rotor Maxx's `structdocapproval` plugin.
 
-**Release:** `0.3.0-alpha` — **test environments only; not production validated**.
+**Release:** `0.3.1-alpha` — **test environments only; not production validated**.
+
+## What's new in 0.3.1-alpha — New User password improvements
+
+- Choose **Set password manually** (default) or **Generate a random password** during local account creation. Manual passwords are validated server-side (8–72 UTF-8 bytes, nonblank, no control characters) and require confirmation. DokuWiki receives the password through `triggerUserMod('create', ...)`.
+- Generated passwords are now **16 URL-safe characters** drawn from 96 bits of randomness, rather than 32 hexadecimal characters. Generated passwords are shown once; passwords supplied manually are never returned to the browser in the create response. Neither is written to the audit log.
+- Copy uses the browser Clipboard API on secure contexts, with a selectable text input and legacy copy fallback for HTTP installations. If clipboard access still fails, the password is automatically selected for Ctrl+C rather than showing an alarming error.
+- **HTTP caution:** Local-only does not mean encrypted. A password submitted over plain HTTP can be read by anyone able to intercept that traffic. Use HTTPS before creating real user accounts, even on a private intranet.
 
 ## What's new in 0.3.0-alpha — Permissions Explorer (read-only)
 
@@ -36,7 +43,7 @@ A standalone administration plugin that lets superusers manage DokuWiki account/
 ## Installation
 
 1. Back up your **test** DokuWiki configuration, `conf/users.auth.php` and `data/meta` before installing or upgrading.
-2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.3.0-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
+2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.3.1-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
 3. If upgrading from v0.1 or v0.2, overwrite/upgrade the existing `groupmanager` extension using the Extension Manager workflow. Runtime `data/meta/groupmanager` data is preserved.
 4. Log in as a DokuWiki superuser and open **Admin → Group Manager**. Check backend support and user/group counts before making any edits.
 5. Begin testing the read-only **Permissions** tab against the existing ACL Manager. Inspect a normal group, a user in several groups, a superuser, page-specific exceptions and orphaned namespace ACL entries. No permission edits are possible from this tab.
@@ -50,7 +57,7 @@ Designed for DokuWiki with Bootstrap3 and PHP 8.2. Files are installed as `/lib/
 - In `authplain`, empty groups have no backend principal of their own. Group Manager's JSON registry preserves the name for future assignment. Creating a registry name **does not** create new ACL rights.
 - Groups referenced *only* in old ACL rules (and never seen assigned to a user) may not appear until an administrator creates them in the registry manually.
 - Role templates are **static conveniences**, not nested DokuWiki security groups. Template changes never retroactively modify employees.
-- New-user onboarding **requires** `getUsers`, `addUser` and `modGroups`. The plugin generates a 32-character random temporary password and displays it once to the administrator after successful creation. Deliver it only via an approved secure channel. New accounts are immediately usable; changing their password later uses Classic User Manager or DokuWiki password change functionality.
+- New-user onboarding **requires** `getUsers`, `addUser` and `modGroups`. The plugin lets an administrator supply a confirmed password or generate a 16-character random temporary password, which is displayed once after successful creation. Deliver it only via an approved secure channel. New accounts are immediately usable; changing their password later uses Classic User Manager or DokuWiki password change functionality.
 - **No automatic welcome mail** is sent. Do not use the generated-password workflow over unsecured HTTP if credentials could be intercepted on your network; enable HTTPS on the test/production site before real onboarding.
 - New-user creation never assigns privileged groups directly. If required, use the temporary override in By User after creating the account.
 - This plugin cannot provision Microsoft Entra/M365 accounts, and cannot update externally managed group memberships when the auth backend prohibits it.

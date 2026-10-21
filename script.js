@@ -1,4 +1,4 @@
-/* DokuWiki Group Manager v0.3.0-alpha. No external JavaScript dependencies. */
+/* DokuWiki Group Manager v0.3.1-alpha. No external JavaScript dependencies. */
 (function () {
     'use strict';
 
@@ -47,6 +47,9 @@
             newOpen: $('#rmsgm-new-open'), newClose: $('#rmsgm-new-close'),
             newName: $('#rmsgm-new-name'), newUsername: $('#rmsgm-new-username'), newEmail: $('#rmsgm-new-email'),
             newTemplate: $('#rmsgm-new-template'), newGroups: $('#rmsgm-new-groups'), newPreview: $('#rmsgm-new-preview'),
+            newPasswordMode: $('#rmsgm-new-password-mode'), newPasswordFields: $('#rmsgm-new-password-fields'),
+            newPassword: $('#rmsgm-new-password'), newPasswordConfirm: $('#rmsgm-new-password-confirm'),
+            newReveal: $('#rmsgm-new-password-reveal'), newPasswordHelp: $('#rmsgm-new-password-help'),
             newReset: $('#rmsgm-new-reset'), newCreate: $('#rmsgm-new-create'), newCredential: $('#rmsgm-new-credential'),
             aclType: $('#rmsgm-acl-type'), aclPrincipal: $('#rmsgm-acl-principal'),
             aclExplicit: $('#rmsgm-acl-explicit'), aclRefresh: $('#rmsgm-acl-refresh'),
@@ -178,6 +181,7 @@
         }
         function newHasDraft() {
             return Boolean(e.newName.value || e.newUsername.value || e.newEmail.value ||
+                e.newPassword.value || e.newPasswordConfirm.value || e.newPasswordMode.value !== 'manual' ||
                 state.newDraft.some((g) => g !== state.directory.defaultGroup));
         }
         function confirmDiscard() {
@@ -290,11 +294,22 @@
             });
             renderNewPreview();
         }
+        function renderPasswordMode() {
+            const generated = e.newPasswordMode.value === 'generate';
+            // Do not keep a previously typed password hidden when switching to generation.
+            if (generated) { e.newPassword.value = ''; e.newPasswordConfirm.value = ''; }
+            e.newPasswordFields.hidden = generated;
+            e.newReveal.hidden = generated;
+            e.newPasswordHelp.textContent = generated ?
+                'Generate a 16-character random password. It is displayed only once after creation.' :
+                'Set an 8–72-byte password with no control characters. It will not be displayed or stored by Group Manager.';
+            renderNewPreview();
+        }
         function renderNewPreview() {
             e.newPreview.textContent = 'Account: ' + (e.newName.value.trim() || '(enter name)') +
                 ' (' + (e.newUsername.value.trim() || 'username') + ') • ' + (e.newEmail.value.trim() || '(email)') +
                 '\nInitial groups: ' + (state.newDraft.length ? unique(state.newDraft).join(', ') : '(none)') +
-                '\nThe temporary password is generated on the server and shown once after creation.';
+                '\nPassword: ' + (e.newPasswordMode.value === 'manual' ? 'Administrator-specified' : 'Generated (16 characters, shown once)');
             renderControls();
         }
         function renderControls() {
@@ -369,10 +384,14 @@
         }
         function resetNew() {
             e.newName.value = ''; e.newUsername.value = ''; e.newEmail.value = ''; e.newTemplate.value = '';
+            e.newPassword.value = ''; e.newPasswordConfirm.value = ''; e.newPasswordMode.value = 'manual';
+            e.newPassword.type = 'password'; e.newPasswordConfirm.type = 'password';
+            e.newReveal.textContent = 'Show passwords';
             state.newDraft = state.directory.defaultGroup ? [state.directory.defaultGroup] : [];
             state.newCreated = false;
             e.newCredential.hidden = true; clear(e.newCredential);
             renderNewUser();
+            renderPasswordMode();
         }
         // Read-only ACL explorer. Every view is retrieved from DokuWiki, never saved here.
         const acl = { epoch: 0, loaded: false, type: 'group', principal: '' };
@@ -642,38 +661,92 @@
             renderNewUser();
         });
         for (const input of [e.newName, e.newUsername, e.newEmail]) input.addEventListener('input', renderNewPreview);
-        e.newReset.addEventListener('click', () => { if (state.newCreated ? window.confirm('Clear the displayed one-time password?') : (!newHasDraft() || window.confirm('Discard the new user form?'))) resetNew(); });
+        e.newPasswordMode.addEventListener('change', renderPasswordMode);
+        e.newReveal.addEventListener('click', () => {
+            const reveal = e.newPassword.type === 'password';
+            e.newPassword.type = reveal ? 'text' : 'password';
+            e.newPasswordConfirm.type = reveal ? 'text' : 'password';
+            e.newReveal.textContent = reveal ? 'Hide passwords' : 'Show passwords';
+        });
+        e.newReset.addEventListener('click', () => {
+            if (state.newCreated ? window.confirm('Clear the one-time account credential display?') :
+                (!newHasDraft() || window.confirm('Discard the new user form?'))) resetNew();
+        });
+        function showGeneratedPassword(password) {
+            e.newCredential.appendChild(node('p', '',
+                'The generated password is shown once. Copy it now and deliver it securely. DokuWiki does not require a password change at first login.'));
+            // A selectable input works on ordinary HTTP as well as on HTTPS.
+            const field = node('input', 'form-control rmsgm-temp-pass');
+            field.type = 'text'; field.readOnly = true; field.value = password;
+            field.autocomplete = 'off'; field.setAttribute('aria-label', 'Generated password');
+            e.newCredential.appendChild(field);
+            const copy = node('button', 'btn btn-default', 'Copy password'); copy.type = 'button';
+            copy.addEventListener('click', () => {
+                const fallback = () => {
+                    field.focus(); field.select(); field.setSelectionRange(0, field.value.length);
+                    let copied = false;
+                    try { copied = Boolean(document.execCommand && document.execCommand('copy')); } catch (exc) { /* selection remains */ }
+                    message(copied ? 'Password copied to clipboard.' :
+                        'Password selected. Press Ctrl+C (or use Copy on your device).', copied ? 'success' : '');
+                };
+                if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(field.value)
+                        .then(() => message('Password copied to clipboard.', 'success'))
+                        .catch(fallback);
+                } else fallback();
+            });
+            e.newCredential.appendChild(copy);
+        }
         e.newCreate.addEventListener('click', () => {
             const username = e.newUsername.value.trim(), name = e.newName.value.trim(), email = e.newEmail.value.trim();
             const groups = unique(state.newDraft);
+            const passwordMode = e.newPasswordMode.value;
             if (!name || !username || !email) { message('Enter full name, username and email before creating the account.', 'error'); return; }
+            if (passwordMode === 'manual') {
+                const password = e.newPassword.value, confirmation = e.newPasswordConfirm.value;
+                // Validate length in UTF-8 bytes (the server performs the authoritative checks).
+                const bytes = new TextEncoder().encode(password).length;
+                if (bytes < 8 || bytes > 72 || !password.trim() || /[\x00-\x1f\x7f]/.test(password)) {
+                    message('Password must be 8–72 bytes and contain no control characters.', 'error'); return;
+                }
+                if (password !== confirmation) { message('Passwords do not match.', 'error'); return; }
+            }
             if (!window.confirm('CREATE USER\n\n' + name + ' (' + username + ')\n' + email +
-                '\nGroups: ' + groups.join(', ') +
-                '\n\nThe system will generate a temporary password, displayed ONCE. Continue?')) return;
+                '\nGroups: ' + groups.join(', ') + '\nPassword: ' +
+                (passwordMode === 'manual' ? 'Set to the password you entered' : 'Generate a 16-character password and display it once') +
+                '\n\nContinue?')) return;
             run(async () => {
-                const created = await request('createUser', { username, name, email, groups: JSON.stringify(groups) });
-                // Never persist the one-time password in local storage or audit logs.
+                const params = { username, name, email, groups: JSON.stringify(groups), password_mode: passwordMode };
+                if (passwordMode === 'manual') {
+                    params.password = e.newPassword.value;
+                    params.password_confirm = e.newPasswordConfirm.value;
+                }
+                // Don't retain manually entered passwords in the form or in request objects after completion.
+                let created;
+                try { created = await request('createUser', params); }
+                finally {
+                    if (passwordMode === 'manual') {
+                        e.newPassword.value = ''; e.newPasswordConfirm.value = '';
+                        params.password = ''; params.password_confirm = '';
+                    }
+                }
                 state.newCreated = true;
-                // Show the one-time password BEFORE refresh: a directory refresh failure must not lose it.
                 clear(e.newCredential); e.newCredential.hidden = false;
                 e.newCredential.appendChild(node('strong', '', 'Account created: ' + created.id));
-                e.newCredential.appendChild(node('p', '', 'One-time display of the generated password. Copy it now and send via an approved secure channel. DokuWiki does not force a password change at first login.'));
-                const code = node('code', 'rmsgm-temp-pass', created.temporaryPassword);
-                e.newCredential.appendChild(code);
-                const copy = node('button', 'btn btn-default', 'Copy password'); copy.type = 'button';
-                copy.addEventListener('click', async () => {
-                    try { await navigator.clipboard.writeText(code.textContent); message('Temporary password copied to clipboard.', 'success'); }
-                    catch (ex) { message('Clipboard access unavailable. Select and copy the displayed password manually.', 'error'); }
-                });
-                e.newCredential.appendChild(copy);
+                if (created.passwordMode === 'generate' && typeof created.temporaryPassword === 'string') {
+                    showGeneratedPassword(created.temporaryPassword);
+                } else {
+                    e.newCredential.appendChild(node('p', '',
+                        'The password you entered has been assigned. No password is displayed or stored by Group Manager.'));
+                }
                 e.newCredential.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                 e.newCreate.disabled = true;
                 try { await reload(true); } catch (refreshError) {
-                    message('User created, but directory refresh failed: ' + refreshError.message + '. Copy the password now.', 'error');
+                    message('User created, but directory refresh failed: ' + refreshError.message + '.', 'error');
                     return;
                 }
                 if (created.warning) message('Created, with warning: ' + created.warning, 'error');
-                else message('User "' + created.id + '" created. Copy the temporary password before leaving.', 'success');
+                else message('User "' + created.id + '" created successfully.', 'success');
             });
         });
         run(async () => { await reload(false); resetNew(); });

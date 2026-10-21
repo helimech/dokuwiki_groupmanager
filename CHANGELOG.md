@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1-alpha — 2026-10-21
+- Add custom initial passwords (with confirmation and server-side validation) to New User, while retaining an optional 16-character random generated password.
+- Copy password now provides an HTTP-compatible selection/copy fallback and clear guidance when clipboard access is unavailable.
+- Preserve v0.3 read-only Permissions Explorer behavior unchanged.
+
 ## 0.3.0-alpha — 2026-10-21
 - Add read-only Permissions Explorer tab for existing users and groups.
 - Load page and namespace tree lazily, including media namespaces and ACL-only references.

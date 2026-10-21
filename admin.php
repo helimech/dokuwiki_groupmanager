@@ -104,6 +104,14 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<div><label for="rmsgm-new-username">Username</label><input class="form-control" id="rmsgm-new-username" maxlength="64" placeholder="e.g. jane.smith" autocomplete="off"></div>';
         echo '<div><label for="rmsgm-new-email">Email address</label><input class="form-control" type="email" id="rmsgm-new-email" maxlength="254" autocomplete="off"></div>';
         echo '<div><label for="rmsgm-new-template">Role template (optional)</label><select class="form-control" id="rmsgm-new-template"></select></div></div>';
+        echo '<div class="rmsgm-password-section"><h4>Initial password</h4>';
+        echo '<label for="rmsgm-new-password-mode">Password option</label>';
+        echo '<select id="rmsgm-new-password-mode" class="form-control"><option value="manual">Set password manually</option><option value="generate">Generate a random password</option></select>';
+        echo '<div id="rmsgm-new-password-fields" class="rmsgm-form-grid">';
+        echo '<div><label for="rmsgm-new-password">Password</label><input id="rmsgm-new-password" class="form-control" type="password" minlength="8" maxlength="72" autocomplete="new-password" spellcheck="false"></div>';
+        echo '<div><label for="rmsgm-new-password-confirm">Confirm password</label><input id="rmsgm-new-password-confirm" class="form-control" type="password" minlength="8" maxlength="72" autocomplete="new-password" spellcheck="false"></div></div>';
+        echo '<button type="button" id="rmsgm-new-password-reveal" class="btn btn-default btn-sm">Show passwords</button>';
+        echo '<p id="rmsgm-new-password-help" class="rmsgm-note">Use 8–72 bytes, with no control characters. Passwords are not saved in Group Manager logs.</p></div>';
         echo '<p class="rmsgm-note">Select a template to add its groups, then adjust individual memberships. Privileged groups cannot be assigned during account creation.</p>';
         echo '<div id="rmsgm-new-groups" class="rmsgm-checkgrid"></div><div id="rmsgm-new-preview" class="rmsgm-preview"></div>';
         echo '<div class="rmsgm-buttons"><button type="button" class="btn btn-default" id="rmsgm-new-reset">Reset</button>';

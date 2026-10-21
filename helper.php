@@ -546,7 +546,10 @@ class helper_plugin_groupmanager extends Plugin
     }
 
     /** Create local users through the auth backend, never by editing users.auth.php. */
-    public function createUser(string $id, string $name, string $email, array $groups): array
+    public function createUser(
+        string $id, string $name, string $email, array $groups,
+        string $passwordMode = 'generate', string $chosenPassword = '', string $passwordConfirmation = ''
+    ): array
     {
         $this->assertSuperuser();
         $backend = $this->backend();
@@ -561,6 +564,18 @@ class helper_plugin_groupmanager extends Plugin
         if ($name === '' || strlen($name) > 150 || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254) {
             throw new InvalidArgumentException('Provide a full name and valid email address.');
         }
+        if ($passwordMode === 'manual') {
+            // Check the exact supplied password; never trim, normalize, log, or echo it.
+            if (strlen($chosenPassword) < 8 || strlen($chosenPassword) > 72 ||
+                trim($chosenPassword) === '' || preg_match('/[\x00-\x1f\x7f]/', $chosenPassword)) {
+                throw new InvalidArgumentException('Password must be 8–72 bytes and contain no control characters.');
+            }
+            if (!hash_equals($chosenPassword, $passwordConfirmation)) {
+                throw new InvalidArgumentException('Password confirmation does not match.');
+            }
+        } elseif ($passwordMode !== 'generate') {
+            throw new InvalidArgumentException('Unsupported password option.');
+        }
         $groups = $this->normalizeGroups($groups);
         global $conf;
         $default = (string) ($conf['defaultgroup'] ?? '');
@@ -574,8 +589,11 @@ class helper_plugin_groupmanager extends Plugin
                 throw new InvalidArgumentException('Assign privileged groups separately using temporary override after creating the user.');
             }
             if ($backend->getUserData($id) !== false) throw new RuntimeException('Username already exists.');
-            // A cryptographically random one-time credential, not persisted in plugin files or audit.
-            $password = bin2hex(random_bytes(16));
+            // 16 URL-safe characters (96 bits) for generated accounts, or a validated chosen password.
+            // Neither credential is persisted in plugin files or audit records.
+            $password = $passwordMode === 'generate'
+                ? rtrim(strtr(base64_encode(random_bytes(12)), '+/', '-_'), '=')
+                : $chosenPassword;
             $record = ['timestamp' => gmdate('c'), 'administrator' => $this->adminId(),
                        'action' => 'createUser', 'user' => $id, 'name' => $name, 'groups' => $groups];
             $this->audit($record + ['result' => 'attempt']);
@@ -592,7 +610,9 @@ class helper_plugin_groupmanager extends Plugin
             if (!@io_saveFile(rtrim($conf['cachedir'], '/\\') . '/sessionpurge', (string) time())) {
                 $warning .= ' Session invalidation marker could not be updated.';
             }
-            return ['id' => $id, 'name' => $name, 'temporaryPassword' => $password, 'warning' => trim($warning)];
+            $result = ['id' => $id, 'name' => $name, 'passwordMode' => $passwordMode, 'warning' => trim($warning)];
+            if ($passwordMode === 'generate') $result['temporaryPassword'] = $password;
+            return $result;
         } finally { $this->unlock($lock); }
     }
 }
