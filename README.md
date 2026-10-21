@@ -65,10 +65,10 @@ A standalone administration plugin that lets superusers manage DokuWiki account/
 ## Installation
 
 1. Back up your **test** DokuWiki configuration, `conf/users.auth.php` and `data/meta` before installing or upgrading.
-2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.3.3-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
+2. In DokuWiki **Extension Manager**, use **Manual Install** with the release archive or the GitHub source ZIP at `https://github.com/helimech/dokuwiki_groupmanager/archive/refs/heads/main.zip`. DokuWiki uses `plugin.info.txt` to identify plugin base `groupmanager`.
 3. If upgrading from v0.1 or v0.2, overwrite/upgrade the existing `groupmanager` extension using the Extension Manager workflow. Runtime `data/meta/groupmanager` data is preserved.
 4. Log in as a DokuWiki superuser and open **Admin → Group Manager**. Check backend support and user/group counts before making any edits.
-5. Begin testing the read-only **Permissions** tab against the existing ACL Manager. Inspect a normal group, a user in several groups, a superuser, page-specific exceptions and orphaned namespace ACL entries. No permission edits are possible from this tab.
+5. Start with the read-only **Access Audit** tab and compare its findings to your existing ACL. Use **Permissions** to verify actual effective access for representative users/groups, including page exceptions and privileged accounts. Neither tab modifies ACL rules.
 6. Regression-test v0.2 membership editing, protected groups, templates and new-user creation with dummy accounts before real use.
 
 Designed for DokuWiki with Bootstrap3 and PHP 8.2. Files are installed as `/lib/plugins/groupmanager/`, regardless of the GitHub repository name.
@@ -77,7 +77,7 @@ Designed for DokuWiki with Bootstrap3 and PHP 8.2. Files are installed as `/lib/
 
 - `authplain` with readable/writable `users.auth.php` supports user lists, local user creation, and group modification. Other authentication backends may be read-only or support only some operations; UI disables unsupported account operations.
 - In `authplain`, empty groups have no backend principal of their own. Group Manager's JSON registry preserves the name for future assignment. Creating a registry name **does not** create new ACL rights.
-- Groups referenced *only* in old ACL rules (and never seen assigned to a user) may not appear until an administrator creates them in the registry manually.
+- Groups referenced only in ACL rules now appear automatically as ACL-referenced groups, even when no users have those memberships; seeing a group in the directory does not mean it is active or should be removed.
 - Role templates are **static conveniences**, not nested DokuWiki security groups. Template changes never retroactively modify employees.
 - New-user onboarding **requires** `getUsers`, `addUser` and `modGroups`. The plugin lets an administrator supply a confirmed password or generate a 16-character random temporary password, which is displayed once after successful creation. Deliver it only via an approved secure channel. New accounts are immediately usable; changing their password later uses Classic User Manager or DokuWiki password change functionality.
 - **No automatic welcome mail** is sent. Do not use the generated-password workflow over unsecured HTTP if credentials could be intercepted on your network; enable HTTPS on the test/production site before real onboarding.
