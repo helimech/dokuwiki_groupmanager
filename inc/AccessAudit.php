@@ -1,0 +1,206 @@
+<?php
+/**
+ * Read-only inventory and diagnostics for the DokuWiki ACL file.
+ *
+ * Flags are leads for human review, not instructions to remove permissions.
+ * It does not modify ACL files, membership or Group Manager's registry.
+ *
+ * @license GPL-2.0-or-later
+ */
+namespace dokuwiki\plugin\groupmanager;
+
+use RuntimeException;
+
+final class AccessAudit
+{
+    private function rules(): array
+    {
+        global $config_cascade;
+        $path = $config_cascade['acl']['default'] ?? '';
+        if (!is_string($path) || !$path || !is_readable($path)) {
+            throw new RuntimeException('The DokuWiki ACL file is not readable.');
+        }
+        $rows = file($path, FILE_IGNORE_NEW_LINES);
+        if (!is_array($rows)) throw new RuntimeException('Unable to read ACL rules.');
+        $out = [];
+        foreach ($rows as $index => $row) {
+            $row = trim($row);
+            if ($row === '' || $row[0] === '#') continue;
+            $parts = preg_split('/\s+/', $row);
+            if (count($parts) < 3 || !ctype_digit($parts[2])) continue;
+            $out[] = [
+                'scope' => $parts[0],
+                'principal' => $parts[1],
+                'level' => (int)$parts[2],
+                'line' => $index + 1,
+            ];
+        }
+        return $out;
+    }
+
+    private function rootOnDisk(string $name, string $kind): bool
+    {
+        global $conf;
+        $base = $conf['datadir'] ?? '';
+        if (!is_string($base) || !$base || str_contains($name, '/') ||
+            str_contains($name, '\\') || str_contains($name, '..') || str_contains($name, '%')) {
+            return false;
+        }
+        $encoded = function_exists('utf8_encodeFN') ? utf8_encodeFN($name) : $name;
+        $path = rtrim($base, '/\\') . '/' . $encoded;
+        return $kind === 'namespace' ? is_dir($path) : is_file($path . '.txt');
+    }
+
+    private function rootInventory(): array
+    {
+        global $conf;
+        $base = $conf['datadir'] ?? '';
+        $roots = [];
+        if (!is_string($base) || !is_dir($base) || !is_readable($base)) return $roots;
+        foreach (new \DirectoryIterator($base) as $item) {
+            if ($item->isDot()) continue;
+            $name = $item->getFilename();
+            $decoded = function_exists('utf8_decodeFN') ? utf8_decodeFN($name) : $name;
+            if ($item->isDir()) {
+                $roots['namespace|' . $decoded] = ['name' => $decoded, 'kind' => 'namespace', 'onDisk' => true];
+            } elseif ($item->isFile() && str_ends_with($decoded, '.txt')) {
+                $id = substr($decoded, 0, -4);
+                $roots['page|' . $id] = ['name' => $id, 'kind' => 'page', 'onDisk' => true];
+            }
+        }
+        return $roots;
+    }
+
+    private function rootScope(string $scope): ?array
+    {
+        if ($scope === '*' || str_contains($scope, '%') || str_contains($scope, '*') && !str_ends_with($scope, ':*')) {
+            return null;
+        }
+        if (str_contains($scope, ':')) {
+            $root = explode(':', $scope, 2)[0];
+            return $root !== '' ? ['name' => $root, 'kind' => 'namespace'] : null;
+        }
+        return ['name' => $scope, 'kind' => 'page'];
+    }
+
+    public function summary(array $directory): array
+    {
+        if (!auth_isadmin()) throw new RuntimeException('Superuser access required.');
+        $rules = $this->rules();
+        $users = [];
+        foreach ($directory['users'] ?? [] as $user) $users[$user['id']] = $user;
+        $groups = [];
+        foreach ($directory['groups'] ?? [] as $group) {
+            $groups[$group['name']] = [
+                'name' => $group['name'], 'members' => (int)$group['count'],
+                'registered' => (bool)($group['registered'] ?? false),
+                'protected' => (bool)($group['protected'] ?? false),
+                'references' => 0, 'scopes' => [], 'maximum' => 0,
+            ];
+        }
+        $entries = $this->rootInventory();
+        $unknownUsers = [];
+        $groupRules = [];
+        $duplicateMap = [];
+        $rootGrants = [];
+        foreach ($rules as $rule) {
+            $principal = $rule['principal'];
+            $scope = $rule['scope'];
+            $key = $scope . "\x00" . $principal;
+            $duplicateMap[$key][] = $rule;
+            $root = $this->rootScope($scope);
+            if ($root !== null) {
+                $key = $root['kind'] . '|' . $root['name'];
+                if (!isset($entries[$key])) {
+                    $entries[$key] = $root + [
+                        'onDisk' => $this->rootOnDisk($root['name'], $root['kind'])
+                    ];
+                }
+                $entries[$key]['ruleCount'] = ($entries[$key]['ruleCount'] ?? 0) + 1;
+                if ($scope === $root['name'] ||
+                    ($root['kind'] === 'namespace' && $scope === $root['name'] . ':*')) {
+                    $entries[$key]['directRuleCount'] = ($entries[$key]['directRuleCount'] ?? 0) + 1;
+                }
+            }
+            if ($scope === '*' && $rule['level'] >= 2) $rootGrants[] = $rule;
+            if ($principal === '@ALL' || str_contains($principal, '%')) continue;
+            if (str_starts_with($principal, '@')) {
+                $name = rawurldecode(substr($principal, 1));
+                if ($name === '') continue;
+                if (!isset($groups[$name])) {
+                    $groups[$name] = ['name' => $name, 'members' => 0, 'registered' => false,
+                        'protected' => false, 'references' => 0, 'scopes' => [], 'maximum' => 0];
+                }
+                ++$groups[$name]['references'];
+                $groups[$name]['maximum'] = max($groups[$name]['maximum'], $rule['level']);
+                if (count($groups[$name]['scopes']) < 12) $groups[$name]['scopes'][] = $scope;
+                $groupRules[$name][] = $rule;
+            } else {
+                $id = rawurldecode($principal);
+                if (!isset($users[$id])) $unknownUsers[$id][] = $rule;
+            }
+        }
+        foreach ($groups as &$group) {
+            $group['scopes'] = array_values(array_unique($group['scopes']));
+            $group['classification'] = $group['members'] === 0 ?
+                ($group['references'] ? 'Empty; ACL rules exist' : 'Empty; no ACL references') :
+                ($group['references'] ? 'In use' : 'Membership only / plugin role');
+        }
+        unset($group);
+        uasort($groups, static fn($a, $b) => strnatcasecmp($a['name'], $b['name']));
+        foreach ($entries as &$entry) {
+            $entry['ruleCount'] = $entry['ruleCount'] ?? 0;
+            $entry['directRuleCount'] = $entry['directRuleCount'] ?? 0;
+        }
+        unset($entry);
+        uasort($entries, static function ($a, $b) {
+            if ($a['kind'] !== $b['kind']) return $a['kind'] === 'namespace' ? -1 : 1;
+            return strnatcasecmp($a['name'], $b['name']);
+        });
+        $findings = [];
+        foreach ($rootGrants as $rule) {
+            $findings[] = ['type' => 'Root-level edit grant', 'severity' => 'review',
+                'title' => $rule['principal'] . ' receives ' . $rule['level'] . ' at wiki root',
+                'detail' => 'Broad default permission; review whether more specific namespaces should carry this access.',
+                'line' => $rule['line']];
+        }
+        foreach ($groups as $group) {
+            if ($group['members'] === 0 && $group['references'] > 0) {
+                $findings[] = ['type' => 'Empty ACL group', 'severity' => 'info',
+                    'title' => '@' . $group['name'] . ' has no current members',
+                    'detail' => 'May be an intentionally reserved or temporarily unused role. Keep until its purpose is confirmed.',
+                    'line' => ($groupRules[$group['name']][0]['line'] ?? 0)];
+            }
+        }
+        foreach ($unknownUsers as $id => $matched) {
+            $findings[] = ['type' => 'Unmatched user ACL', 'severity' => 'review',
+                'title' => 'ACL references user ' . $id . ' (not found)',
+                'detail' => 'Check for a renamed, removed or intentionally reserved account before removing its ACL.',
+                'line' => $matched[0]['line']];
+        }
+        foreach ($duplicateMap as $same) {
+            if (count($same) < 2) continue;
+            $first = $same[0];
+            $findings[] = ['type' => 'Duplicate ACL scope/principal', 'severity' => 'review',
+                'title' => $first['scope'] . ' / ' . $first['principal'] . ' occurs ' . count($same) . ' times',
+                'detail' => 'Multiple rules for the same scope and principal; check for redundant or conflicting levels.',
+                'line' => $first['line']];
+        }
+        foreach ($entries as $entry) {
+            if ($entry['onDisk'] || $entry['ruleCount'] === 0) continue;
+            $findings[] = ['type' => 'ACL-only root entry', 'severity' => 'info',
+                'title' => $entry['name'] . ' (' . $entry['kind'] . ')',
+                'detail' => 'Referenced in ACL, but no matching root page/folder on disk. May be virtual, planned, moved or obsolete.',
+                'line' => 0];
+        }
+        return [
+            'totals' => ['users' => count($users), 'groups' => count($groups),
+                'rules' => count($rules), 'rootEntries' => count($entries),
+                'findings' => count($findings)],
+            'groups' => array_values($groups),
+            'entries' => array_values($entries),
+            'findings' => $findings,
+            'notice' => 'Review hints only. Namespace summaries show explicit rule counts, not effective access. Use Permissions to inspect a specific user or group.',
+        ];
+    }
+}
