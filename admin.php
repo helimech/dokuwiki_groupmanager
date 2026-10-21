@@ -99,7 +99,8 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<div class="rmsgm-card"><h3>Why this permission?</h3><div id="rmsgm-acl-detail" class="rmsgm-acl-detail" aria-live="polite">Select a page or namespace in the tree.</div></div></div>';
         echo '</section>';
         echo '<section class="rmsgm-panel" data-panel="audit" hidden>';
-        echo '<div class="rmsgm-card rmsgm-audit-header"><div><h3>Access Audit <small>(read-only)</small></h3><p class="rmsgm-note">Review ACL rules and group references. Findings are not deletion recommendations. Workflow roles can be used by plugins without ACL rules.</p></div><button type="button" class="btn btn-default" id="rmsgm-audit-refresh">Refresh audit</button></div>';
+        echo '<div class="rmsgm-card rmsgm-audit-header"><div><h3>Access Audit <small>(read-only)</small></h3><p class="rmsgm-note">Review ACL rules and group references. Findings are not deletion recommendations. Workflow roles can be used by plugins without ACL rules.</p></div><div class="rmsgm-audit-header-actions"><button type="button" class="btn btn-default" id="rmsgm-audit-refresh">Refresh audit</button><button type="button" class="btn btn-primary" id="rmsgm-audit-export">Export full snapshot (JSON)</button></div></div>';
+        echo '<p class="rmsgm-note">Export captures the current wiki: usernames, real names, memberships, written ACL rules, page IDs and namespace IDs. Passwords, email addresses and page contents are excluded. Treat the downloaded file as internal information.</p>';
         echo '<p id="rmsgm-audit-status" class="rmsgm-muted" role="status"></p>';
         echo '<div id="rmsgm-audit-totals" class="rmsgm-audit-totals"></div>';
         echo '<div class="rmsgm-audit-subtabs" role="tablist" aria-label="Access audit sections"><button type="button" class="btn btn-default active" data-audit-view="groups">Groups</button><button type="button" class="btn btn-default" data-audit-view="roots">Namespaces &amp; pages</button><button type="button" class="btn btn-default" data-audit-view="findings">Diagnostics</button></div>';
@@ -128,7 +129,7 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<button type="button" class="btn btn-primary" id="rmsgm-new-create">Preview &amp; Create User</button></div>';
         echo '<div id="rmsgm-new-credential" class="rmsgm-credential" hidden></div></div></section>';
         echo '<p class="rmsgm-footnote">Temporary override applies to one save only. Membership management does not edit ACL rules. Permissions Explorer and Access Audit are read-only.</p>';
-        echo '<script defer src="' . hsc(DOKU_BASE . 'lib/plugins/groupmanager/audit.js?v=0.4.1') . '"></script>';
+        echo '<script defer src="' . hsc(DOKU_BASE . 'lib/plugins/groupmanager/audit.js?v=0.4.2') . '"></script>';
         echo '</div>';
     }
 }

@@ -70,6 +70,17 @@ class action_plugin_groupmanager extends ActionPlugin
                         $INPUT->str('password_mode', 'generate'), $INPUT->str('password'), $INPUT->str('password_confirm')
                     );
                     break;
+                case 'accessExport':
+                    // Export is intentionally read-only and uses the same POST/CSRF/admin gate
+                    // as the other Group Manager operations. The browser downloads the JSON.
+                    global $auth, $conf;
+                    if (!($auth instanceof \dokuwiki\Extension\AuthPlugin) || empty($conf['useacl'])) {
+                        throw new RuntimeException('DokuWiki ACLs are disabled or authentication is unavailable.');
+                    }
+                    require_once __DIR__ . '/inc/AccessAudit.php';
+                    $exportService = new \dokuwiki\plugin\groupmanager\AccessAudit();
+                    $result = $exportService->exportSnapshot($helper->directoryData());
+                    break;
                 case 'accessAudit':
                     global $auth, $conf;
                     if (!($auth instanceof \dokuwiki\Extension\AuthPlugin) || empty($conf['useacl'])) {

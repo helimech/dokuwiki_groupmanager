@@ -12,6 +12,10 @@ mkdir($temp);
 mkdir($temp . '/pages');
 mkdir($temp . '/pages/wip');
 mkdir($temp . '/pages/hr');
+mkdir($temp . '/media');
+mkdir($temp . '/media/photos');
+file_put_contents($temp . '/pages/wip/status.txt', "WORK IN PROGRESS PRIVATE TEXT");
+file_put_contents($temp . '/pages/hr/employee.txt', "EMPLOYEE CONFIDENTIAL PAGE");
 file_put_contents($temp . '/pages/start.txt', "start");
 $acl = $temp . '/acl.auth.php';
 file_put_contents($acl, "# <?php exit()?>\n"
@@ -24,19 +28,25 @@ file_put_contents($acl, "# <?php exit()?>\n"
     . "forms:*\t@forms\t8\n"
     . "staff:calendar\tolduser\t1\n"
     . "wip:*\t@wip\t8\n");
-$conf = ['datadir' => $temp . '/pages'];
+$conf = ['datadir' => $temp . '/pages', 'mediadir' => $temp . '/media'];
 $config_cascade = ['acl' => ['default' => $acl]];
 require_once dirname(__DIR__) . '/inc/AccessAudit.php';
 try {
     $audit = new \dokuwiki\plugin\groupmanager\AccessAudit();
-    $result = $audit->summary([
-        'users' => [['id' => 'forms', 'name' => 'Service', 'groups' => ['admin']]],
+    $directory = [
+        'supported' => true,
+        'users' => [
+            ['id' => 'forms', 'name' => 'Virtual Forms', 'groups' => ['admin'],
+                'mail' => 'test@example.com', 'pass' => 'NEVER_EXPORT_PASSWORD'],
+            ['id' => 'worker', 'name' => 'Test Worker', 'groups' => ['staff', 'wip']]
+        ],
         'groups' => [
             ['name' => 'wip', 'count' => 1, 'registered' => false],
             ['name' => 'manager', 'count' => 1, 'registered' => false],
             ['name' => 'newemploy', 'count' => 1, 'registered' => false]
         ]
-    ]);
+    ];
+    $result = $audit->summary($directory);
     $groups = array_column($result['groups'], null, 'name');
     checkAudit($result['totals']['rules'] === 9, 'counts actual ACL rules');
     checkAudit($groups['contract']['members'] === 0, 'keeps empty reserved contractor group');
@@ -63,12 +73,34 @@ try {
     checkAudit(in_array('Unmatched user ACL', $types, true), 'flags ACL for unknown user');
     checkAudit(in_array('Duplicate ACL scope/principal', $types, true), 'flags duplicated ACL entries');
     checkAudit(in_array('Empty ACL group', $types, true), 'reviews but does not delete empty groups');
+    $snapshot = $audit->exportSnapshot($directory);
+    checkAudit($snapshot['schema'] === 'groupmanager-access-audit-v1', 'portable schema marker');
+    checkAudit(count($snapshot['users']) === 2, 'exports all current user accounts');
+    checkAudit($snapshot['counts']['aclRules'] === 9, 'retains every written ACL rule');
+    checkAudit($snapshot['aclRules'][1]['permission'] === 'Upload', 'provides readable ACL level');
+    checkAudit(in_array('hr', $snapshot['inventory']['namespaces'], true), 'exports namespace structure');
+    checkAudit(in_array('wip:status', $snapshot['inventory']['pages'], true), 'exports nested page IDs');
+    checkAudit(in_array('hr:employee', $snapshot['inventory']['pages'], true), 'exports confidential page ID, not page content');
+    checkAudit(in_array('photos', $snapshot['inventory']['mediaNamespaces'], true), 'exports media namespace structure');
+    $exportedGroups = array_column($snapshot['groups'], null, 'name');
+    checkAudit($exportedGroups['wip']['members'] === ['worker'], 'exports members of functional groups');
+    checkAudit($exportedGroups['forms']['members'] === [], 'keeps namesake service account separate from ACL group');
+    checkAudit($exportedGroups['contract']['members'] === [], 'preserves reserved empty groups');
+    $json = json_encode($snapshot, JSON_THROW_ON_ERROR);
+    checkAudit(!str_contains($json, 'NEVER_EXPORT_PASSWORD'), 'excludes password data');
+    checkAudit(!str_contains($json, 'test@example.com'), 'excludes email data');
+    checkAudit(!str_contains($json, 'EMPLOYEE CONFIDENTIAL PAGE'), 'excludes page content');
+    checkAudit(!str_contains($json, $temp), 'excludes absolute filesystem paths');
     echo "Access audit smoke tests passed.\n";
 } finally {
     unlink($acl);
     unlink($temp . '/pages/start.txt');
+    unlink($temp . '/pages/wip/status.txt');
+    unlink($temp . '/pages/hr/employee.txt');
     rmdir($temp . '/pages/wip');
     rmdir($temp . '/pages/hr');
     rmdir($temp . '/pages');
+    rmdir($temp . '/media/photos');
+    rmdir($temp . '/media');
     rmdir($temp);
 }

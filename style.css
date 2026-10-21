@@ -137,3 +137,7 @@
 #rmsgm .rmsgm-audit-severity.review { color:#925700; border-color:#e3bb70; }
 #rmsgm .rmsgm-audit-finding p { margin:7px 0 2px; }
 @media(max-width:700px) { #rmsgm .rmsgm-audit-table th, #rmsgm .rmsgm-audit-table td { padding:7px 6px; font-size:.88em; } }
+
+/* v0.4.2: audit export action. */
+#rmsgm .rmsgm-audit-header-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; }
+@media (max-width:700px) { #rmsgm .rmsgm-audit-header-actions { justify-content:flex-start; } }
