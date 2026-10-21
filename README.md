@@ -2,7 +2,15 @@
 
 A standalone administration plugin that lets superusers manage DokuWiki account/group memberships through searchable checkboxes, preserve empty group names, apply static onboarding role templates, and create local users through DokuWiki's supported authentication API. Independent of Rotor Maxx's `structdocapproval` plugin.
 
-**Release:** `0.4.0-alpha` — **test environments only; not production validated**.
+**Release:** `0.4.1-alpha` — **test environments only; not production validated**.
+
+## What's improved in 0.4.1-alpha — Access Audit readability
+
+- Make the selected Access Audit subtab readable under Bootstrap3 themes: dark lettering on a pale-blue highlighted button (including hover/focus).
+- Spell out permission levels in diagnostic headlines (e.g. `@manager receives Upload at wiki root` rather than `8`).
+- Under **Groups → Show ACL scopes**, show each actual ACL scope with its permission label (e.g. `wip:* — Upload`). Preserve separate rows for repeated ACL rules and annotate the original ACL line in the row tooltip.
+- These are permissions **specified by individual ACL entries**, not necessarily the effective permissions for a user with multiple groups; use **Permissions Explorer** to verify combined access.
+- No ACL edits or membership changes. CLI audit smoke tests now assert the human-readable levels.
 
 ## What's new in 0.4.0-alpha — Access Audit (read-only)
 
