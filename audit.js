@@ -1,4 +1,4 @@
-/* Group Manager v0.4.0-alpha: standalone, read-only Access Audit UI. */
+/* Group Manager v0.4.2-alpha: standalone, read-only Access Audit and export UI. */
 (function () {
     'use strict';
     function boot() {
@@ -159,6 +159,55 @@
                 button.disabled = false;
             }
         }
+        async function exportSnapshot() {
+            const button = $('#rmsgm-audit-export');
+            if (button.disabled) return;
+            button.disabled = true;
+            status.textContent = 'Collecting current wiki users, ACLs, pages and namespaces for export…';
+            try {
+                const body = new URLSearchParams({
+                    call: 'plugin_groupmanager',
+                    gm_action: 'accessExport',
+                    sectok: root.dataset.token
+                });
+                const response = await fetch(root.dataset.ajax, {
+                    method: 'POST', body, cache: 'no-store',
+                    credentials: 'same-origin', headers: { Accept: 'application/json' }
+                });
+                const json = await response.json();
+                if (!response.ok || !json.ok) throw new Error(json.error || 'Export request failed.');
+                const snapshot = json.data;
+                if (!snapshot || snapshot.schema !== 'groupmanager-access-audit-v1' ||
+                    !Array.isArray(snapshot.users) || !Array.isArray(snapshot.aclRules) ||
+                    !snapshot.inventory) {
+                    throw new Error('The server returned an incomplete audit snapshot.');
+                }
+                const payload = JSON.stringify(snapshot, null, 2) + '\n';
+                const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const anchor = document.createElement('a');
+                const stamp = (snapshot.generatedAtUtc || new Date().toISOString())
+                    .replace(/[^0-9A-Za-z-]/g, '-');
+                anchor.download = 'groupmanager-access-audit-' + stamp + '.json';
+                anchor.href = url;
+                anchor.style.display = 'none';
+                document.body.appendChild(anchor);
+                try { anchor.click(); }
+                finally {
+                    anchor.remove();
+                    // Allow time for browsers to attach the blob to the download.
+                    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+                }
+                status.textContent = 'Audit snapshot prepared (' +
+                    snapshot.counts.users + ' users, ' +
+                    snapshot.counts.aclRules + ' ACL rules, ' +
+                    snapshot.counts.pages + ' pages). Check your browser downloads.';
+            } catch (ex) {
+                status.textContent = 'Unable to export audit: ' + (ex.message || String(ex));
+            } finally {
+                button.disabled = false;
+            }
+        }
         function activate(section) {
             currentView = section;
             panel.querySelectorAll('[data-audit-view]').forEach((button) => {
@@ -176,6 +225,7 @@
             if (!panel.hidden) load(false);
         });
         $('#rmsgm-audit-refresh').addEventListener('click', () => load(true));
+        $('#rmsgm-audit-export').addEventListener('click', exportSnapshot);
         $('#rmsgm-audit-group-filter').addEventListener('input', renderGroups);
         $('#rmsgm-audit-root-filter').addEventListener('input', renderRoots);
         $('#rmsgm-audit-finding-filter').addEventListener('input', renderFindings);
