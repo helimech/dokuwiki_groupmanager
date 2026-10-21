@@ -2,7 +2,17 @@
 
 A standalone administration plugin that lets superusers manage DokuWiki account/group memberships through searchable checkboxes, preserve empty group names, apply static onboarding role templates, and create local users through DokuWiki's supported authentication API. Independent of Rotor Maxx's `structdocapproval` plugin.
 
-**Release:** `0.3.3-alpha` — **test environments only; not production validated**.
+**Release:** `0.4.0-alpha` — **test environments only; not production validated**.
+
+## What's new in 0.4.0-alpha — Access Audit (read-only)
+
+- **Access Audit** tab with searchable **Groups**, **Namespaces & pages**, and **Diagnostics**, plus live totals for users, groups, ACL rules and review notes.
+- Inventory reads the current ACL file and root-level page/namespace filesystem. Show group member counts, number and examples of ACL references, whether a root entry exists on disk, and direct versus descendant rule counts.
+- Highlight broad root-level edit grants, empty ACL-referenced groups, unmatched ACL usernames, repeated scope/principal ACL entries and ACL-only root entries. These are **review hints**, not permission failures or deletion recommendations.
+- Empty ACL groups are not assumed obsolete: reserved contractor access, workflows and onboarding roles may have a business purpose even when membership is zero or ACL usage is absent.
+- **ACL-only groups** (e.g. \`@contract\` and \`@forms\`) now appear in Group Manager's directory and Permissions Explorer even if no users belong to them. A service-account username \`forms\` remains separate from the group \`@forms\`.
+- Open the existing **Permissions Explorer** for any audited group to inspect effective access via DokuWiki's ACL evaluator. Audit rule counts alone do **not** prove effective permissions.
+- No modifications to existing ACLs, memberships or passwords from the audit. Test on a non-production wiki before updating live deployments.
 
 ## What's fixed in 0.3.3-alpha — post-onboarding navigation
 
@@ -99,19 +109,23 @@ These files are deliberately **not removed** by uninstalling the plugin; preserv
 - `action.php`: authenticated/CSRF-protected AJAX controller
 - `helper.php`: backend adapter, registry, templates, onboarding and audit
 - `inc/AclExplorer.php`: read-only ACL scope explorer, wildcard expansion, DokuWiki evaluation and matching-rule explanation
+- `inc/AccessAudit.php`: superuser-only ACL/group/namespace audit and non-destructive diagnostics
+- `audit.js`: independent client-side Access Audit UI and navigation into Permissions Explorer
 - `script.js`: interactive UI and Classic User Manager link
 - `style.css`: scoped responsive Bootstrap3 styling
 - `lang/en/lang.php`, `admin.svg`, `plugin.info.txt`: plugin metadata
 - `tests/smoke.php`: CLI-only mock-backend tests (source ZIP/repo only)
 - `tests/acl_explorer.php`: CLI-only ACL-specific diagnostics tests (source ZIP/repo only)
+- `tests/access_audit.php`: CLI-only audit smoke tests (source ZIP/repo only)
 
 For local checks:
 
 ```bash
-php -l admin.php && php -l action.php && php -l helper.php && php -l inc/AclExplorer.php
-node --check script.js
+php -l admin.php && php -l action.php && php -l helper.php && php -l inc/AclExplorer.php && php -l inc/AccessAudit.php
+node --check script.js && node --check audit.js
 php tests/smoke.php
 php tests/acl_explorer.php
+php tests/access_audit.php
 ```
 
 The mock tests do **not** replace browser tests against your real DokuWiki release, permission configuration, ACL event extensions, email policy or PHP-FPM environment.
