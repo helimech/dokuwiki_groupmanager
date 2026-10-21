@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2-alpha — 2026-10-21
+- Fix CSS compilation on DokuWiki by replacing unsupported `width:min(100%, 350px)` with equivalent `width:100%; max-width:350px` on the New User password field.
+- No changes to PHP authentication, role templates, JavaScript, or read-only Permissions Explorer behavior.
+
 ## 0.3.1-alpha — 2026-10-21
 - Add custom initial passwords (with confirmation and server-side validation) to New User, while retaining an optional 16-character random generated password.
 - Copy password now provides an HTTP-compatible selection/copy fallback and clear guidance when clipboard access is unavailable.

@@ -92,4 +92,4 @@
 #rmsgm .rmsgm-password-section h4 { margin:0 0 8px; }
 #rmsgm #rmsgm-new-password-mode { max-width:440px; }
 #rmsgm #rmsgm-new-password-reveal { margin-top:9px; }
-#rmsgm input.rmsgm-temp-pass { display:block; width:min(100%, 350px); font-family:monospace; cursor:text; user-select:text; margin:12px 0; }
+#rmsgm input.rmsgm-temp-pass { display:block; width:100%; max-width:350px; box-sizing:border-box; font-family:monospace; cursor:text; user-select:text; margin:12px 0; }

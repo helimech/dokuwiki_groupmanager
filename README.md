@@ -2,7 +2,12 @@
 
 A standalone administration plugin that lets superusers manage DokuWiki account/group memberships through searchable checkboxes, preserve empty group names, apply static onboarding role templates, and create local users through DokuWiki's supported authentication API. Independent of Rotor Maxx's `structdocapproval` plugin.
 
-**Release:** `0.3.1-alpha` — **test environments only; not production validated**.
+**Release:** `0.3.2-alpha` — **test environments only; not production validated**.
+
+## What's fixed in 0.3.2-alpha — CSS compatibility
+
+- Fix a DokuWiki CSS compilation error on the New User generated-password field by using `width:100%; max-width:350px` rather than CSS `min()`; preserves responsive appearance.
+- No behavior changes to account creation or the read-only Permissions Explorer.
 
 ## What's new in 0.3.1-alpha — New User password improvements
 
@@ -43,7 +48,7 @@ A standalone administration plugin that lets superusers manage DokuWiki account/
 ## Installation
 
 1. Back up your **test** DokuWiki configuration, `conf/users.auth.php` and `data/meta` before installing or upgrading.
-2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.3.1-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
+2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.3.2-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
 3. If upgrading from v0.1 or v0.2, overwrite/upgrade the existing `groupmanager` extension using the Extension Manager workflow. Runtime `data/meta/groupmanager` data is preserved.
 4. Log in as a DokuWiki superuser and open **Admin → Group Manager**. Check backend support and user/group counts before making any edits.
 5. Begin testing the read-only **Permissions** tab against the existing ACL Manager. Inspect a normal group, a user in several groups, a superuser, page-specific exceptions and orphaned namespace ACL entries. No permission edits are possible from this tab.
