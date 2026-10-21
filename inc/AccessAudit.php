@@ -98,10 +98,10 @@ final class AccessAudit
         return ['name' => $scope, 'kind' => 'page'];
     }
 
-    public function summary(array $directory): array
+    public function summary(array $directory, ?array $rules = null): array
     {
         if (!auth_isadmin()) throw new RuntimeException('Superuser access required.');
-        $rules = $this->rules();
+        $rules = $rules ?? $this->rules();
         $users = [];
         foreach ($directory['users'] ?? [] as $user) $users[$user['id']] = $user;
         $groups = [];
@@ -246,4 +246,139 @@ final class AccessAudit
             'notice' => 'Read-only ACL inventory. Permission names are cumulative (Upload includes Create, Edit and Read). Rules shown for a group are written ACL entries, not necessarily the effective access of its members. Use Permissions to inspect users.',
         ];
     }
+    /**
+     * Export actual filesystem identifiers, without page contents or absolute paths.
+     * An unreadable tree or a limit hit fails the export instead of producing a
+     * misleading partial backup.
+     */
+    private function diskInventory(string $configKey, bool $pages): array
+    {
+        global $conf;
+        $root = $conf[$configKey] ?? '';
+        if (!is_string($root) || $root === '' || !is_dir($root) || !is_readable($root)) {
+            throw new RuntimeException('The wiki ' . $configKey . ' directory is not accessible for audit export.');
+        }
+        $root = rtrim($root, '/\\');
+        $namespaces = [];
+        $pageIDs = [];
+        $count = 0;
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ($iterator as $entry) {
+                if ($entry->isLink()) continue; // Do not export content from symlinked external trees.
+                $isDir = $entry->isDir();
+                if (!$isDir && (!$pages || !str_ends_with($entry->getFilename(), '.txt'))) continue;
+                if (++$count > 50000) {
+                    throw new RuntimeException('Audit export stopped: ' . $configKey . ' has over 50,000 entries. No partial snapshot was downloaded.');
+                }
+                $relative = substr($entry->getPathname(), strlen($root) + 1);
+                $segments = explode('/', str_replace('\\', '/', $relative));
+                if (!$isDir) {
+                    $last = count($segments) - 1;
+                    $segments[$last] = substr($segments[$last], 0, -4);
+                }
+                $segments = array_map(static fn($segment) =>
+                    function_exists('utf8_decodeFN') ? utf8_decodeFN($segment) : $segment, $segments);
+                $id = implode(':', $segments);
+                if ($id === '') continue;
+                if ($isDir) $namespaces[] = $id;
+                else $pageIDs[] = $id;
+            }
+        } catch (\UnexpectedValueException $e) {
+            throw new RuntimeException('Unable to read a wiki directory during export: ' . $configKey, 0, $e);
+        }
+        natcasesort($namespaces);
+        natcasesort($pageIDs);
+        return [
+            'namespaces' => array_values($namespaces),
+            'pages' => array_values($pageIDs),
+        ];
+    }
+
+    /**
+     * Build a sanitized portable snapshot of the CURRENT wiki.
+     * Never read or serialize password hashes, password fields, email addresses,
+     * page content, absolute paths, or full auth configuration.
+     */
+    public function exportSnapshot(array $directory): array
+    {
+        if (!auth_isadmin()) throw new RuntimeException('Superuser access required.');
+        if (empty($directory['supported'])) throw new RuntimeException('The user directory is unavailable.');
+        $rules = $this->rules();
+        $audit = $this->summary($directory, $rules);
+        $users = [];
+        $members = [];
+        foreach ($directory['users'] ?? [] as $record) {
+            $id = (string) ($record['id'] ?? '');
+            if ($id === '') continue;
+            $groups = array_values(array_map('strval', $record['groups'] ?? []));
+            $users[] = [
+                'username' => $id,
+                'name' => (string) ($record['name'] ?? ''),
+                'groups' => $groups,
+            ];
+            foreach ($groups as $group) $members[$group][] = $id;
+        }
+        usort($users, static fn($a, $b) => strnatcasecmp($a['username'], $b['username']));
+        $groups = [];
+        foreach ($audit['groups'] as $group) {
+            $names = $members[$group['name']] ?? [];
+            natcasesort($names);
+            $groups[] = [
+                'name' => $group['name'],
+                'members' => array_values($names),
+                'memberCount' => count($names),
+                'aclRuleCount' => $group['references'],
+                'classification' => $group['classification'],
+                'aclRules' => $group['scopeRules'] ?? [],
+            ];
+        }
+        $writtenRules = array_map(fn($rule) => [
+            'line' => $rule['line'],
+            'scope' => $rule['scope'],
+            'principal' => $rule['principal'],
+            'level' => $rule['level'],
+            'permission' => $this->permissionName($rule['level']),
+        ], $rules);
+        $pages = $this->diskInventory('datadir', true);
+        $media = $this->diskInventory('mediadir', false);
+        return [
+            'schema' => 'groupmanager-access-audit-v1',
+            'generatedAtUtc' => gmdate('Y-m-d\TH:i:s\Z'),
+            'dataSource' => 'current DokuWiki installation',
+            'privacy' => [
+                'contains' => ['usernames', 'real names', 'group memberships', 'ACL rules', 'page and namespace IDs'],
+                'excluded' => ['passwords', 'password hashes', 'email addresses', 'wiki page contents', 'absolute server paths'],
+            ],
+            'counts' => [
+                'users' => count($users),
+                'groups' => count($groups),
+                'aclRules' => count($writtenRules),
+                'namespaces' => count($pages['namespaces']),
+                'pages' => count($pages['pages']),
+                'mediaNamespaces' => count($media['namespaces']),
+                'diagnostics' => count($audit['findings']),
+            ],
+            'users' => $users,
+            'groups' => $groups,
+            'aclRules' => $writtenRules,
+            'inventory' => [
+                'namespaces' => $pages['namespaces'],
+                'pages' => $pages['pages'],
+                'mediaNamespaces' => $media['namespaces'],
+                'rootSummary' => $audit['entries'],
+            ],
+            'diagnostics' => $audit['findings'],
+            'limitations' => [
+                'Snapshot contains written ACL rules, not a precomputed per-user effective-access matrix.',
+                'DokuWiki ACL precedence and plugin hooks must be checked against the running wiki before making changes.',
+                'Workflow or plugin-specific permissions outside acl.auth.php are not captured.',
+                'This is a read-only best-effort snapshot, not an atomic backup of concurrent administrative changes.',
+            ],
+        ];
+    }
+
 }
