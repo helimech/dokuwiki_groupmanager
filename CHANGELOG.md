@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3-alpha — 2026-10-21
+- Correct post-creation dirty-state warnings: successful manual-password onboarding never prompts about unsaved edits or a non-existent one-time password.
+- Continue to warn before abandoning a displayed generated password; centralize this warning across navigation and Reset.
+- Reset completed New User state on navigation; lock the completed account form until another onboarding session begins.
+- Add dependency-free Node.js navigation regression tests. No changes to membership, authentication, or ACL calculation APIs.
+
 ## 0.3.2-alpha — 2026-10-21
 - Fix CSS compilation on DokuWiki by replacing unsupported `width:min(100%, 350px)` with equivalent `width:100%; max-width:350px` on the New User password field.
 - No changes to PHP authentication, role templates, JavaScript, or read-only Permissions Explorer behavior.

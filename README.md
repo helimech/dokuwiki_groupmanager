@@ -2,7 +2,14 @@
 
 A standalone administration plugin that lets superusers manage DokuWiki account/group memberships through searchable checkboxes, preserve empty group names, apply static onboarding role templates, and create local users through DokuWiki's supported authentication API. Independent of Rotor Maxx's `structdocapproval` plugin.
 
-**Release:** `0.3.2-alpha` — **test environments only; not production validated**.
+**Release:** `0.3.3-alpha` — **test environments only; not production validated**.
+
+## What's fixed in 0.3.3-alpha — post-onboarding navigation
+
+- **Manual-password account creation:** after successfully creating the account, switching tabs, returning to Group Manager, or clearing the form does not raise an unnecessary unsaved-data or one-time-password warning. The saved account is not treated as a pending edit.
+- **Generated-password account creation:** the one-time-password departure confirmation appears only while the newly generated password is displayed. It is consistently applied to Return, tab navigation, New User, and Reset; cancelling keeps the password visible.
+- After successful creation, the completed New User form is locked until Reset or a new onboarding session; navigation away clears that completed state so the next New User session starts cleanly.
+- No server-side changes to account creation or DokuWiki permissions. Includes dependency-free client navigation regression tests.
 
 ## What's fixed in 0.3.2-alpha — CSS compatibility
 
@@ -48,7 +55,7 @@ A standalone administration plugin that lets superusers manage DokuWiki account/
 ## Installation
 
 1. Back up your **test** DokuWiki configuration, `conf/users.auth.php` and `data/meta` before installing or upgrading.
-2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.3.2-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
+2. In DokuWiki **Extension Manager**, use **Manual Install** with `dokuwiki-plugin-groupmanager-v0.3.3-alpha.zip`. The ZIP contains a top-level `groupmanager/` directory.
 3. If upgrading from v0.1 or v0.2, overwrite/upgrade the existing `groupmanager` extension using the Extension Manager workflow. Runtime `data/meta/groupmanager` data is preserved.
 4. Log in as a DokuWiki superuser and open **Admin → Group Manager**. Check backend support and user/group counts before making any edits.
 5. Begin testing the read-only **Permissions** tab against the existing ACL Manager. Inspect a normal group, a user in several groups, a superuser, page-specific exceptions and orphaned namespace ACL entries. No permission edits are possible from this tab.

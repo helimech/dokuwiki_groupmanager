@@ -1,4 +1,4 @@
-/* DokuWiki Group Manager v0.3.1-alpha. No external JavaScript dependencies. */
+/* DokuWiki Group Manager v0.3.3-alpha. No external JavaScript dependencies. */
 (function () {
     'use strict';
 
@@ -26,7 +26,8 @@
         const $ = (s) => root.querySelector(s);
         const state = {
             directory: null, user: '', group: '', userDraft: [], groupDraft: new Set(),
-            templateId: '', templateDraft: [], newDraft: [], active: 'user', busy: false, newCreated: false
+            templateId: '', templateDraft: [], newDraft: [], active: 'user', busy: false,
+            newCreated: false, generatedPasswordVisible: false
         };
         const e = {
             notice: $('.rmsgm-alert'), warning: $('.rmsgm-unsupported'),
@@ -184,7 +185,15 @@
                 e.newPassword.value || e.newPasswordConfirm.value || e.newPasswordMode.value !== 'manual' ||
                 state.newDraft.some((g) => g !== state.directory.defaultGroup));
         }
+        function confirmLeaveNewUserResult() {
+            // A manually chosen password was never displayed; the account is already saved.
+            // Only warn when leaving a screen that actually holds a generated one-time password.
+            return !state.generatedPasswordVisible || window.confirm(
+                'Leave the one-time password display? Be sure you have saved the generated password securely.'
+            );
+        }
         function confirmDiscard() {
+            if (state.active === 'new' && state.newCreated) return confirmLeaveNewUserResult();
             if (!userEdits().length && !groupEdits().length && (state.active !== 'new' || !newHasDraft())) return true;
             return window.confirm('Discard unsaved changes?');
         }
@@ -284,7 +293,7 @@
             state.directory.groups.filter((g) => !g.protected).forEach((g) => {
                 const label = node('label'); const check = node('input');
                 check.type = 'checkbox'; check.checked = state.newDraft.includes(g.name);
-                check.disabled = g.name === state.directory.defaultGroup || !state.directory.canCreate;
+                check.disabled = state.newCreated || g.name === state.directory.defaultGroup || !state.directory.canCreate;
                 check.addEventListener('change', () => {
                     state.newDraft = check.checked ? unique([...state.newDraft, g.name]) : state.newDraft.filter((v) => v !== g.name);
                     renderNewPreview();
@@ -326,6 +335,10 @@
             e.createGroup.disabled = !state.directory.supported;
             e.newOpen.disabled = !state.directory.canCreate;
             e.newCreate.disabled = !state.directory.canCreate || state.newCreated;
+            for (const field of [e.newName, e.newUsername, e.newEmail, e.newTemplate,
+                e.newPasswordMode, e.newPassword, e.newPasswordConfirm, e.newReveal]) {
+                field.disabled = state.newCreated;
+            }
             e.apply.disabled = !writable || !user(state.user) || !selectedTemplateId(e.applyTemplate);
             e.templateDelete.disabled = !state.templateId;
         }
@@ -389,6 +402,7 @@
             e.newReveal.textContent = 'Show passwords';
             state.newDraft = state.directory.defaultGroup ? [state.directory.defaultGroup] : [];
             state.newCreated = false;
+            state.generatedPasswordVisible = false;
             e.newCredential.hidden = true; clear(e.newCredential);
             renderNewUser();
             renderPasswordMode();
@@ -554,14 +568,19 @@
         e.aclRefresh.addEventListener('click', aclRefresh);
 
         root.querySelectorAll('[data-tab]').forEach((tab) => tab.addEventListener('click', () => {
-            if (state.active !== tab.dataset.tab && !confirmDiscard()) return;
+            if (state.active === tab.dataset.tab) return;
+            if (!confirmDiscard()) return;
+            if (state.active === 'new') resetNew();
             resetDrafts(); switchPanel(tab.dataset.tab); renderUser(); renderGroup();
         }));
         e.newOpen.addEventListener('click', () => {
             if (!confirmDiscard()) return;
             resetDrafts(); resetNew(); switchPanel('new');
         });
-        e.newClose.addEventListener('click', () => { if (state.newCreated ? window.confirm('Leave the one-time password display? Be sure you have saved the password securely.') : confirmDiscard()) { resetNew(); switchPanel('user'); } });
+        e.newClose.addEventListener('click', () => {
+            if (!confirmDiscard()) return;
+            resetNew(); resetDrafts(); switchPanel('user'); renderUser(); renderGroup();
+        });
         e.userSearch.addEventListener('input', renderUserList);
         e.userGroupSearch.addEventListener('input', renderUser);
         e.userList.addEventListener('change', () => {
@@ -669,7 +688,7 @@
             e.newReveal.textContent = reveal ? 'Hide passwords' : 'Show passwords';
         });
         e.newReset.addEventListener('click', () => {
-            if (state.newCreated ? window.confirm('Clear the one-time account credential display?') :
+            if (state.newCreated ? confirmLeaveNewUserResult() :
                 (!newHasDraft() || window.confirm('Discard the new user form?'))) resetNew();
         });
         function showGeneratedPassword(password) {
@@ -731,6 +750,8 @@
                     }
                 }
                 state.newCreated = true;
+                state.generatedPasswordVisible = created.passwordMode === 'generate' &&
+                    typeof created.temporaryPassword === 'string';
                 clear(e.newCredential); e.newCredential.hidden = false;
                 e.newCredential.appendChild(node('strong', '', 'Account created: ' + created.id));
                 if (created.passwordMode === 'generate' && typeof created.temporaryPassword === 'string') {
