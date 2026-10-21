@@ -178,6 +178,28 @@ final class AccessAudit
                 'detail' => 'Check for a renamed, removed or intentionally reserved account before removing its ACL.',
                 'line' => $matched[0]['line']];
         }
+        // Same spelling does not make a user account a member of its namesake group.
+        foreach ($groups as $group) {
+            if (!isset($users[$group['name']]) || $group['members'] > 0) continue;
+            $findings[] = ['type' => 'Account/group name collision', 'severity' => 'info',
+                'title' => $group['name'] . ' (account) and @' . $group['name'] . ' (group) are separate',
+                'detail' => 'An account with this login exists but is not a member of the matching group. This may be intentional for service accounts.',
+                'line' => 0];
+        }
+        $groupNames = array_keys($groups);
+        for ($i = 0; $i < count($groupNames); $i++) {
+            for ($j = $i + 1; $j < count($groupNames); $j++) {
+                $a = $groupNames[$i];
+                $b = $groupNames[$j];
+                if (strlen($a) < 5 || strlen($b) < 5 ||
+                    strtolower($a) === strtolower($b) ||
+                    levenshtein(strtolower($a), strtolower($b)) > 2) continue;
+                $findings[] = ['type' => 'Similar group names', 'severity' => 'info',
+                    'title' => '@' . $a . ' and @' . $b,
+                    'detail' => 'Check whether these intentionally represent different roles before consolidating or renaming either group.',
+                    'line' => 0];
+            }
+        }
         foreach ($duplicateMap as $same) {
             if (count($same) < 2) continue;
             $first = $same[0];
