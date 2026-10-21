@@ -169,6 +169,28 @@ class helper_plugin_groupmanager extends Plugin
         return $this->sortNames($names);
     }
 
+    /** Discover ACL-referenced groups, including intentionally empty reserved roles. */
+    private function aclGroupNames(): array
+    {
+        global $config_cascade;
+        $path = $config_cascade['acl']['default'] ?? '';
+        if (!is_string($path) || !$path || !is_readable($path)) return [];
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        if (!is_array($lines)) return [];
+        $groups = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') continue;
+            $parts = preg_split('/\s+/', $line);
+            if (count($parts) < 3 || !ctype_digit($parts[2])) continue;
+            $principal = $parts[1];
+            if (!str_starts_with($principal, '@') || $principal === '@ALL' || str_contains($principal, '%')) continue;
+            $name = rawurldecode(substr($principal, 1));
+            if ($name !== '') $groups[] = $name;
+        }
+        return $this->sortNames($groups);
+    }
+
     /** Sanitized view: never return passwords or raw auth records. */
     public function directoryData(bool $sync = false): array
     {
@@ -216,7 +238,8 @@ class helper_plugin_groupmanager extends Plugin
             $groupNames[] = $conf['defaultgroup'];
         }
         // Also preserve configured privileged groups, including those with zero members.
-        $groupNames = $this->sortNames(array_merge($groupNames, $this->protectedGroups()));
+        $aclNames = $this->aclGroupNames();
+        $groupNames = $this->sortNames(array_merge($groupNames, $this->protectedGroups(), $aclNames));
         if ($sync) {
             $registered = $this->syncRegistry($groupNames);
         }
@@ -227,6 +250,7 @@ class helper_plugin_groupmanager extends Plugin
                 'name' => $name,
                 'count' => $counts[$name] ?? 0,
                 'registered' => in_array($name, $registered, true),
+                'referencedByAcl' => in_array($name, $aclNames, true),
                 'forgettable' => $name !== ($conf['defaultgroup'] ?? '') && !in_array(strtolower($name), array_map('strtolower', $protected), true),
                 'protected' => in_array(strtolower($name), array_map('strtolower', $protected), true),
             ];
