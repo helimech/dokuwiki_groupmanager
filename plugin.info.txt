@@ -3,5 +3,5 @@ author Rotor Maxx Support Limited
 email  
 date   2026-10-21
 name   Group Manager
-desc   Group Manager v0.4.1-alpha: users, permissions explorer and read-only access audit.
+desc   Group Manager v0.4.2-alpha: users, permissions explorer and read-only access audit.
 url    https://github.com/helimech/dokuwiki_groupmanager
