@@ -38,6 +38,21 @@ final class AccessAudit
         return $out;
     }
 
+    /** DokuWiki's ordered, cumulative ACL levels in words. */
+    private function permissionName(int $level): string
+    {
+        return match ($level) {
+            0 => 'None',
+            1 => 'Read',
+            2 => 'Edit',
+            4 => 'Create',
+            8 => 'Upload',
+            16 => 'Delete',
+            255 => 'Superuser',
+            default => 'Level ' . $level,
+        };
+    }
+
     private function rootOnDisk(string $name, string $kind): bool
     {
         global $conf;
@@ -142,6 +157,12 @@ final class AccessAudit
         }
         foreach ($groups as &$group) {
             $group['scopes'] = array_values(array_unique($group['scopes']));
+            // Preserve each written rule and its permission. It is not an effective-access result.
+            $group['scopeRules'] = array_map(fn(array $rule): array => [
+                'scope' => $rule['scope'],
+                'permission' => $this->permissionName($rule['level']),
+                'line' => $rule['line'],
+            ], $groupRules[$group['name']] ?? []);
             $group['classification'] = $group['members'] === 0 ?
                 ($group['references'] ? 'Empty; ACL rules exist' : 'Empty; no ACL references') :
                 ($group['references'] ? 'In use' : 'Membership only / plugin role');
@@ -160,7 +181,7 @@ final class AccessAudit
         $findings = [];
         foreach ($rootGrants as $rule) {
             $findings[] = ['type' => 'Root-level edit grant', 'severity' => 'review',
-                'title' => $rule['principal'] . ' receives ' . $rule['level'] . ' at wiki root',
+                'title' => $rule['principal'] . ' receives ' . $this->permissionName($rule['level']) . ' at wiki root',
                 'detail' => 'Broad default permission; review whether more specific namespaces should carry this access.',
                 'line' => $rule['line']];
         }
@@ -222,7 +243,7 @@ final class AccessAudit
             'groups' => array_values($groups),
             'entries' => array_values($entries),
             'findings' => $findings,
-            'notice' => 'Review hints only. Namespace summaries show explicit rule counts, not effective access. Use Permissions to inspect a specific user or group.',
+            'notice' => 'Read-only ACL inventory. Permission names are cumulative (Upload includes Create, Edit and Read). Rules shown for a group are written ACL entries, not necessarily the effective access of its members. Use Permissions to inspect users.',
         ];
     }
 }
