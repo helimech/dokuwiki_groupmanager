@@ -128,7 +128,7 @@ class admin_plugin_groupmanager extends AdminPlugin
         echo '<button type="button" class="btn btn-primary" id="rmsgm-new-create">Preview &amp; Create User</button></div>';
         echo '<div id="rmsgm-new-credential" class="rmsgm-credential" hidden></div></div></section>';
         echo '<p class="rmsgm-footnote">Temporary override applies to one save only. Membership management does not edit ACL rules. Permissions Explorer and Access Audit are read-only.</p>';
-        echo '<script defer src="' . hsc(DOKU_BASE . 'lib/plugins/groupmanager/audit.js?v=0.4.0') . '"></script>';
+        echo '<script defer src="' . hsc(DOKU_BASE . 'lib/plugins/groupmanager/audit.js?v=0.4.1') . '"></script>';
         echo '</div>';
     }
 }
