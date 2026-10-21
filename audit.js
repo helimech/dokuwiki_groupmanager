@@ -72,8 +72,16 @@
                 if (g.references) {
                     const detail = el('details', 'rmsgm-audit-scope-list');
                     detail.appendChild(el('summary', '', 'Show ACL scopes'));
-                    const list = el('div');
-                    (g.scopes || []).forEach((scope) => list.appendChild(el('code', '', scope)));
+                    const list = el('div', 'rmsgm-audit-scope-rules');
+                    (g.scopeRules || []).forEach((rule) => {
+                        const row = el('div', 'rmsgm-audit-scope-rule');
+                        row.append(
+                            el('code', '', rule.scope),
+                            el('span', 'rmsgm-audit-permission', rule.permission)
+                        );
+                        if (rule.line) row.title = 'ACL file line ' + rule.line;
+                        list.appendChild(row);
+                    });
                     detail.appendChild(list);
                     name.appendChild(detail);
                 }
