@@ -82,13 +82,12 @@ A standalone administration plugin that lets superusers manage DokuWiki account/
 
 ## Installation
 
-1. Back up your **test** DokuWiki configuration, `conf/users.auth.php` and `data/meta` before installing or upgrading.
-2. In DokuWiki **Extension Manager**, use **Manual Install** with the release archive or the GitHub source ZIP at `https://github.com/helimech/dokuwiki_groupmanager/archive/refs/heads/main.zip`. DokuWiki uses `plugin.info.txt` to identify plugin base `groupmanager`.
-3. If upgrading from v0.1 or v0.2, overwrite/upgrade the existing `groupmanager` extension using the Extension Manager workflow. Runtime `data/meta/groupmanager` data is preserved.
-4. Log in as a DokuWiki superuser and open **Admin → Group Manager**. Check backend support and user/group counts before making any edits.
-5. Start with the read-only **Access Audit** tab and compare its findings to your existing ACL. Use **Permissions** to verify actual effective access for representative users/groups, including page exceptions and privileged accounts. Neither tab modifies ACL rules.
-7. Use **Export full snapshot (JSON)** from the live wiki once validated. Upload the downloaded JSON for offline analysis or retain it as a dated audit baseline. The JSON contains employee identities and namespace/page IDs; protect it accordingly.
-6. Regression-test v0.2 membership editing, protected groups, templates and new-user creation with dummy accounts before real use.
+1. Back up your test wiki's `conf/users.auth.php`, `conf/acl.auth.php`, `data/meta` and existing `lib/plugins/groupmanager/` before upgrading. Take equivalent backups before updating production.
+2. Upgrade the existing extension in DokuWiki's **Extension Manager** using the release package or the [v0.4.2-alpha source ZIP](https://github.com/helimech/dokuwiki_groupmanager/archive/refs/heads/v0.4.2-alpha.zip).
+3. On the **test wiki**, open **Admin → Group Manager → Access Audit** and verify Groups, Diagnostics and **Export full snapshot (JSON)**. The new download does not write to ACL or user files.
+4. Re-test the existing Permissions Explorer, membership editing, protected groups, templates, and new-user creation on dummy accounts before considering production use.
+5. Once verified, install on the **live wiki**, choose **Access Audit → Export full snapshot (JSON)** and save the downloaded file securely. Upload it here for permissions analysis or retain it as a dated baseline.
+6. **Important:** only the Access Audit and export are read-only. The rest of Group Manager still includes account and membership editing functions. A whole-plugin production read-only lock is a separate future feature.
 
 Designed for DokuWiki with Bootstrap3 and PHP 8.2. Files are installed as `/lib/plugins/groupmanager/`, regardless of the GitHub repository name.
 
