@@ -1,0 +1,15 @@
+name: DokuWiki Default Tasks
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions: write-all
+
+jobs:
+  all:
+    uses: dokuwiki/github-action/.github/workflows/all.yml@main

@@ -1,16 +1,18 @@
 <?php
+
 /**
  * Read-only ACL explorer for Group Manager.
  *
  * @license GPL-2.0-or-later
  */
+
 namespace dokuwiki\plugin\groupmanager;
 
 use dokuwiki\Extension\AuthPlugin;
 use InvalidArgumentException;
 use RuntimeException;
 
-final class AclExplorer
+final readonly class AclExplorer
 {
     private AuthPlugin $backend;
 
@@ -31,7 +33,7 @@ final class AclExplorer
             $info = $this->backend->getUserData($name);
             if (!is_array($info)) throw new InvalidArgumentException('The selected user no longer exists.');
             return ['kind' => 'user', 'name' => $name, 'user' => $name,
-                'groups' => array_values(array_unique(array_map('strval', $info['grps'] ?? [])))];
+                'groups' => array_values(array_unique(array_map(strval(...), $info['grps'] ?? [])))];
         }
         // A group may be empty and exist only in Group Manager's preserved registry.
         // Validation of the name against the registry takes place in the AJAX controller.
@@ -122,7 +124,8 @@ final class AclExplorer
     {
         $principal = rawurldecode($principal);
         $case = $this->backend->isCaseSensitive();
-        $normalize = static fn($v) => $case ? $v : (function_exists('mb_strtolower') ? mb_strtolower($v) : strtolower($v));
+        $normalize = static fn($value) =>
+            $case ? $value : (function_exists('mb_strtolower') ? mb_strtolower($value) : strtolower($value));
         if ($principal === '@ALL') return true;
         if (str_starts_with($principal, '@')) {
             return in_array($normalize(substr($principal, 1)), array_map($normalize, $subject['groups']), true);
@@ -148,8 +151,9 @@ final class AclExplorer
                 unset($rule);
                 $applicable[] = ['scope' => $scope, 'rules' => $matched, 'winningLevel' => $highest,
                     'selected' => true, 'isExact' => $order === 0];
+                $counter = count($scopes);
                 // Collect broader matching entries for explaining overrides, without changing selection.
-                for ($k = $order + 1; $k < count($scopes); $k++) {
+                for ($k = $order + 1; $k < $counter; $k++) {
                     $other = [];
                     foreach ($rules as $rule) {
                         if ($rule['scope'] === $scopes[$k] && $this->matchesSubject($rule['principal'], $subject)) {
@@ -310,7 +314,8 @@ final class AclExplorer
                 $visible[] = array_merge($child, $permission, [
                     'name' => substr($id, (strrpos($id, ':') === false ? -1 : strrpos($id, ':')) + 1),
                     'hasChildren' => $type === 'namespace',
-                    'hasExplicitBelow' => $type === 'namespace' && $this->hasRelevantExplicitBelow($rules, $subject, $id, $type),
+                    'hasExplicitBelow' => $type === 'namespace'
+                        && $this->hasRelevantExplicitBelow($rules, $subject, $id, $type),
                 ]);
             }
         });
@@ -318,15 +323,27 @@ final class AclExplorer
             if ($a['type'] !== $b['type']) return $a['type'] === 'namespace' ? -1 : 1;
             return strnatcasecmp($a['name'], $b['name']);
         });
-        return ['nodes' => $visible, 'parent' => $parent, 'subject' => ['kind' => $kind, 'name' => $name],
-            'dynamicRuleCount' => count(array_filter($this->rawRules(), static fn($r) => str_contains($r['scope'] . $r['principal'], '%USER%') || str_contains($r['scope'] . $r['principal'], '%GROUP%')))];
+        $dynamicRuleCount = count(array_filter(
+            $this->rawRules(),
+            static fn($rule) =>
+                str_contains($rule['scope'] . $rule['principal'], '%USER%')
+                || str_contains($rule['scope'] . $rule['principal'], '%GROUP%')
+        ));
+        return [
+            'nodes' => $visible,
+            'parent' => $parent,
+            'subject' => ['kind' => $kind, 'name' => $name],
+            'dynamicRuleCount' => $dynamicRuleCount,
+        ];
     }
 
     public function explain(string $kind, string $name, string $id, string $type): array
     {
         if (!auth_isadmin()) throw new RuntimeException('Superuser access required.');
         $subject = $this->validateSubject($kind, $name);
-        if ($type !== 'root' && $type !== 'namespace' && $type !== 'page') throw new InvalidArgumentException('Invalid node type.');
+        if (!in_array($type, ['root', 'namespace', 'page'], true)) {
+            throw new InvalidArgumentException('Invalid node type.');
+        }
         if (($id === '' && $type !== 'root') || strlen($id) > 500 || ($id !== '' && cleanID($id) !== $id)) {
             throw new InvalidArgumentException('Invalid page or namespace ID.');
         }

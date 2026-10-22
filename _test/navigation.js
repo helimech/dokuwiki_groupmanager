@@ -1,4 +1,4 @@
-/* Run: node tests/navigation.js. No npm dependencies. */
+/* Run: node _test/navigation.js. No npm dependencies. */
 'use strict';
 const fs = require('node:fs');
 const vm = require('node:vm');

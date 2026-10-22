@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Membership service for the DokuWiki Group Manager plugin.
  * @license GPL-2.0-or-later
@@ -98,7 +99,11 @@ class helper_plugin_groupmanager extends Plugin
         $tmp = @tempnam($this->directory(), 'registry-');
         if (!$tmp) throw new RuntimeException('Could not create temporary registry file.');
         try {
-            $json = json_encode(['schema' => 1, 'groups' => $this->sortNames($groups)], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
+            $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR;
+            $json = json_encode(
+                ['schema' => 1, 'groups' => $this->sortNames($groups)],
+                $flags
+            ) . "\n";
             if (@file_put_contents($tmp, $json) !== strlen($json)) {
                 throw new RuntimeException('Failed to write registry.');
             }
@@ -138,7 +143,7 @@ class helper_plugin_groupmanager extends Plugin
     {
         global $conf;
         $v = $conf[$key] ?? '';
-        if (is_array($v)) return array_values(array_filter($v, 'is_string'));
+        if (is_array($v)) return array_values(array_filter($v, is_string(...)));
         if (!is_string($v)) return [];
         return preg_split('/[\s,;]+/', trim($v), -1, PREG_SPLIT_NO_EMPTY) ?: [];
     }
@@ -149,7 +154,7 @@ class helper_plugin_groupmanager extends Plugin
         $names = ['admin', 'manager'];
         foreach (['superuser', 'manager'] as $key) {
             foreach ($this->configuredEntries($key) as $entry) {
-                if (strpos($entry, '@') === 0 && strlen($entry) > 1) {
+                if (str_starts_with($entry, '@') && strlen($entry) > 1) {
                     $names[] = substr($entry, 1);
                 }
             }
@@ -244,6 +249,7 @@ class helper_plugin_groupmanager extends Plugin
             $registered = $this->syncRegistry($groupNames);
         }
         $protected = $this->protectedGroups();
+        $protectedLower = array_map(strtolower(...), $protected);
         $groups = [];
         foreach ($groupNames as $name) {
             $groups[] = [
@@ -251,19 +257,20 @@ class helper_plugin_groupmanager extends Plugin
                 'count' => $counts[$name] ?? 0,
                 'registered' => in_array($name, $registered, true),
                 'referencedByAcl' => in_array($name, $aclNames, true),
-                'forgettable' => $name !== ($conf['defaultgroup'] ?? '') && !in_array(strtolower($name), array_map('strtolower', $protected), true),
-                'protected' => in_array(strtolower($name), array_map('strtolower', $protected), true),
+                'forgettable' => $name !== ($conf['defaultgroup'] ?? '')
+                    && !in_array(strtolower($name), $protectedLower, true),
+                'protected' => in_array(strtolower($name), $protectedLower, true),
             ];
         }
         usort($users, static fn($a, $b) => strnatcasecmp($a['name'], $b['name']) ?: strnatcasecmp($a['id'], $b['id']));
         return [
             'supported' => true,
             'writable' => (bool) $backend->canDo('modGroups'),
-            'canCreate' => (bool) ($backend->canDo('addUser') && $backend->canDo('modGroups')),
+            'canCreate' => $backend->canDo('addUser') && $backend->canDo('modGroups'),
             'defaultGroup' => (string) ($conf['defaultgroup'] ?? ''),
             'self' => $this->adminId(),
             'templates' => $this->templates(),
-            'backend' => get_class($backend),
+            'backend' => $backend::class,
             'users' => $users,
             'groups' => $groups,
         ];
@@ -323,7 +330,9 @@ class helper_plugin_groupmanager extends Plugin
                 $id = is_string($id) ? $id : '';
                 $entry = ['user' => $id, 'ok' => false, 'message' => 'Not processed.'];
                 try {
-                    if ($id === '' || isset($seen[$id])) throw new InvalidArgumentException('Invalid or duplicate username.');
+                    if ($id === '' || isset($seen[$id])) {
+                        throw new InvalidArgumentException('Invalid or duplicate username.');
+                    }
                     $seen[$id] = true;
                     if (!in_array($id, array_column($listing['users'], 'id'), true)) {
                         throw new RuntimeException('User is not in the browsable user directory.');
@@ -339,13 +348,23 @@ class helper_plugin_groupmanager extends Plugin
                         throw new RuntimeException('This privileged account requires override and cannot be your own.');
                     }
                     $current = $this->normalizeGroups($info['grps'] ?? []);
-                    if ($before !== $current) throw new RuntimeException('Conflict: memberships changed since you loaded them. Refresh and review.');
-                    if (array_diff($after, $available)) throw new RuntimeException('Unknown group. Refresh the group list.');
-                    $privileged = array_map('strtolower', $protectedGroups);
+                    if ($before !== $current) {
+                        throw new RuntimeException(
+                            'Conflict: memberships changed since you loaded them. Refresh and review.'
+                        );
+                    }
+                    if (array_diff($after, $available)) {
+                        throw new RuntimeException('Unknown group. Refresh the group list.');
+                    }
+                    $privileged = array_map(strtolower(...), $protectedGroups);
                     $changedGroups = array_merge(array_diff($before, $after), array_diff($after, $before));
-                    if (array_intersect($privileged, array_map('strtolower', $changedGroups))) {
-                        if (!$override) throw new RuntimeException('Privileged group changes require temporary override.');
-                        if ($id === $this->adminId()) throw new RuntimeException('Cannot modify your own privileged memberships.');
+                    if (array_intersect($privileged, array_map(strtolower(...), $changedGroups))) {
+                        if (!$override) {
+                            throw new RuntimeException('Privileged group changes require temporary override.');
+                        }
+                        if ($id === $this->adminId()) {
+                            throw new RuntimeException('Cannot modify your own privileged memberships.');
+                        }
                         if ($this->wouldRemoveLastSuperuser($backend, $id, $after)) {
                             throw new RuntimeException('Cannot remove the last effective superuser.');
                         }
@@ -373,9 +392,14 @@ class helper_plugin_groupmanager extends Plugin
                         try {
                             $this->audit($record + ['result' => 'success']);
                             $entry = ['user' => $id, 'ok' => true, 'message' => 'Saved.'];
-                        } catch (Throwable $auditError) {
-                            $warnings[] = 'Audit completion record failed for ' . $id . '; an intent record was written.';
-                            $entry = ['user' => $id, 'ok' => true, 'message' => 'Saved, but audit completion record failed.'];
+                        } catch (Throwable) {
+                            $warnings[] = 'Audit completion record failed for ' . $id .
+                                '; an intent record was written.';
+                            $entry = [
+                                'user' => $id,
+                                'ok' => true,
+                                'message' => 'Saved, but audit completion record failed.',
+                            ];
                         }
                     }
                 } catch (Throwable $e) {
@@ -399,9 +423,15 @@ class helper_plugin_groupmanager extends Plugin
     public function createGroup(string $name): array
     {
         $this->assertSuperuser();
-        if (strtolower($name) === 'all') throw new InvalidArgumentException('ALL is reserved by DokuWiki ACL and is not a user-managed group.');
+        if (strtolower($name) === 'all') {
+            throw new InvalidArgumentException(
+                'ALL is reserved by DokuWiki ACL and is not a user-managed group.'
+            );
+        }
         if (!preg_match('/^[a-z][a-z0-9_.-]{0,63}$/D', $name)) {
-            throw new InvalidArgumentException('Use 1–64 lowercase letters, digits, dots, dashes, or underscores; begin with a letter.');
+            throw new InvalidArgumentException(
+                'Use 1–64 lowercase letters, digits, dots, dashes, or underscores; begin with a letter.'
+            );
         }
         $backend = $this->backend();
         if (!$backend || !$backend->canDo('getUsers')) {
@@ -415,10 +445,22 @@ class helper_plugin_groupmanager extends Plugin
             $groups = $this->registry();
             $existing = array_column($this->directoryData()['groups'], 'name');
             if (in_array($name, $groups, true)) throw new RuntimeException('Group is already in the registry.');
-            $this->audit(['timestamp' => gmdate('c'), 'administrator' => $this->adminId(), 'action' => 'createGroup', 'group' => $name, 'result' => 'attempt']);
+            $this->audit([
+                'timestamp' => gmdate('c'),
+                'administrator' => $this->adminId(),
+                'action' => 'createGroup',
+                'group' => $name,
+                'result' => 'attempt',
+            ]);
             $groups[] = $name;
             $this->saveRegistry($groups);
-            $this->audit(['timestamp' => gmdate('c'), 'administrator' => $this->adminId(), 'action' => 'createGroup', 'group' => $name, 'result' => 'success']);
+            $this->audit([
+                'timestamp' => gmdate('c'),
+                'administrator' => $this->adminId(),
+                'action' => 'createGroup',
+                'group' => $name,
+                'result' => 'success',
+            ]);
             return ['created' => true, 'alreadyInBackend' => in_array($name, $existing, true)];
         } finally {
             $this->unlock($lock);
@@ -434,7 +476,10 @@ class helper_plugin_groupmanager extends Plugin
             $registry = $this->registry();
             if (!in_array($name, $registry, true)) throw new RuntimeException('Group is not registered.');
             global $conf;
-            if ($name === ($conf['defaultgroup'] ?? '') || in_array(strtolower($name), array_map('strtolower', $this->protectedGroups()), true)) {
+            if (
+                $name === ($conf['defaultgroup'] ?? '') ||
+                in_array(strtolower($name), array_map(strtolower(...), $this->protectedGroups()), true)
+            ) {
                 throw new RuntimeException('Cannot forget a required or privileged group.');
             }
             foreach ($this->templates() as $template) {
@@ -444,11 +489,25 @@ class helper_plugin_groupmanager extends Plugin
             }
             $directory = $this->directoryData();
             foreach ($directory['groups'] as $group) {
-                if ($group['name'] === $name && $group['count'] !== 0) throw new RuntimeException('Group still has members.');
+                if ($group['name'] === $name && $group['count'] !== 0) {
+                    throw new RuntimeException('Group still has members.');
+                }
             }
-            $this->audit(['timestamp' => gmdate('c'), 'administrator' => $this->adminId(), 'action' => 'forgetGroup', 'group' => $name, 'result' => 'attempt']);
+            $this->audit([
+                'timestamp' => gmdate('c'),
+                'administrator' => $this->adminId(),
+                'action' => 'forgetGroup',
+                'group' => $name,
+                'result' => 'attempt',
+            ]);
             $this->saveRegistry(array_values(array_diff($registry, [$name])));
-            $this->audit(['timestamp' => gmdate('c'), 'administrator' => $this->adminId(), 'action' => 'forgetGroup', 'group' => $name, 'result' => 'success']);
+            $this->audit([
+                'timestamp' => gmdate('c'),
+                'administrator' => $this->adminId(),
+                'action' => 'forgetGroup',
+                'group' => $name,
+                'result' => 'success',
+            ]);
             return ['forgotten' => true];
         } finally {
             $this->unlock($lock);
@@ -468,8 +527,10 @@ class helper_plugin_groupmanager extends Plugin
             $id = (string) $id;
             $groups = $id === $target ? $replacement : ($info['grps'] ?? []);
             foreach ($rules as $rule) {
-                if (($rule !== '' && $rule[0] !== '@' && $rule === $id) ||
-                    ($rule !== '' && $rule[0] === '@' && in_array(substr($rule, 1), $groups, true))) {
+                if (
+                    ($rule !== '' && $rule[0] !== '@' && $rule === $id) ||
+                    ($rule !== '' && $rule[0] === '@' && in_array(substr($rule, 1), $groups, true))
+                ) {
                     $remaining++;
                     break;
                 }
@@ -493,13 +554,19 @@ class helper_plugin_groupmanager extends Plugin
         $items = [];
         $seen = [];
         foreach ($decoded['templates'] as $value) {
-            if (!is_array($value) || !isset($value['id'], $value['name'], $value['groups']) ||
+            if (
+                !is_array($value) || !isset($value['id'], $value['name'], $value['groups']) ||
                 !is_string($value['id']) || !preg_match('/^[a-z][a-z0-9_-]{0,63}$/D', $value['id']) ||
-                !is_string($value['name']) || !is_array($value['groups']) || isset($seen[$value['id']])) {
+                !is_string($value['name']) || !is_array($value['groups']) || isset($seen[$value['id']])
+            ) {
                 throw new RuntimeException('Invalid template entry.');
             }
             $seen[$value['id']] = true;
-            $items[] = ['id' => $value['id'], 'name' => $value['name'], 'groups' => $this->normalizeGroups($value['groups'])];
+            $items[] = [
+                'id' => $value['id'],
+                'name' => $value['name'],
+                'groups' => $this->normalizeGroups($value['groups']),
+            ];
         }
         usort($items, static fn($a, $b) => strnatcasecmp($a['name'], $b['name']));
         return $items;
@@ -512,8 +579,11 @@ class helper_plugin_groupmanager extends Plugin
         $tmp = @tempnam($this->directory(), 'template-');
         if (!$tmp) throw new RuntimeException('Cannot create temporary template file.');
         try {
-            $json = json_encode(['schema' => 1, 'templates' => $templates], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
-            if (@file_put_contents($tmp, $json) !== strlen($json)) throw new RuntimeException('Unable to write templates.');
+            $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR;
+            $json = json_encode(['schema' => 1, 'templates' => $templates], $flags) . "\n";
+            if (@file_put_contents($tmp, $json) !== strlen($json)) {
+                throw new RuntimeException('Unable to write templates.');
+            }
             @chmod($tmp, 0640);
             if (!@rename($tmp, $file)) throw new RuntimeException('Unable to replace template registry.');
         } finally {
@@ -524,33 +594,50 @@ class helper_plugin_groupmanager extends Plugin
     public function saveTemplate(string $id, string $name, array $groups): array
     {
         $this->assertSuperuser();
-        if ($id !== '' && !preg_match('/^[a-z][a-z0-9_-]{0,63}$/D', $id)) throw new InvalidArgumentException('Invalid role template ID.');
+        if ($id !== '' && !preg_match('/^[a-z][a-z0-9_-]{0,63}$/D', $id)) {
+            throw new InvalidArgumentException('Invalid role template ID.');
+        }
         $name = trim($name);
-        if ($name === '' || strlen($name) > 80) throw new InvalidArgumentException('Template name must be 1–80 characters.');
+        if ($name === '' || strlen($name) > 80) {
+            throw new InvalidArgumentException('Template name must be 1–80 characters.');
+        }
         $groups = $this->normalizeGroups($groups);
         if (!$groups) throw new InvalidArgumentException('Select at least one group for the template.');
         $lock = $this->lock();
         try {
             $available = array_column($this->directoryData()['groups'], 'name');
-            if (array_diff($groups, $available)) throw new InvalidArgumentException('Template contains unknown group(s).');
-            if (array_intersect(array_map('strtolower', $groups), array_map('strtolower', $this->protectedGroups()))) {
+            if (array_diff($groups, $available)) {
+                throw new InvalidArgumentException('Template contains unknown group(s).');
+            }
+            if (
+                array_intersect(
+                    array_map(strtolower(...), $groups),
+                    array_map(strtolower(...), $this->protectedGroups())
+                )
+            ) {
                 throw new InvalidArgumentException('Privileged groups cannot be included in reusable templates.');
             }
             $items = $this->templates();
             if ($id === '') $id = 'r_' . bin2hex(random_bytes(8));
             $found = false;
             foreach ($items as &$item) {
-                if ($item['id'] === $id) { $item = compact('id', 'name', 'groups'); $found = true; break; }
+                if ($item['id'] === $id) {
+                    $item = ['id' => $id, 'name' => $name, 'groups' => $groups];
+                    $found = true;
+                    break;
+                }
             }
             unset($item);
-            if (!$found) $items[] = compact('id', 'name', 'groups');
+            if (!$found) $items[] = ['id' => $id, 'name' => $name, 'groups' => $groups];
             $audit = ['timestamp' => gmdate('c'), 'administrator' => $this->adminId(),
                       'action' => 'saveTemplate', 'template' => $id, 'name' => $name, 'groups' => $groups];
             $this->audit($audit + ['result' => 'attempt']);
             $this->storeTemplates($items);
             $this->audit($audit + ['result' => 'success']);
             return ['id' => $id];
-        } finally { $this->unlock($lock); }
+        } finally {
+            $this->unlock($lock);
+        }
     }
 
     public function deleteTemplate(string $id): array
@@ -561,27 +648,40 @@ class helper_plugin_groupmanager extends Plugin
             $items = $this->templates();
             $filtered = array_values(array_filter($items, static fn($item) => $item['id'] !== $id));
             if (count($filtered) === count($items)) throw new InvalidArgumentException('Template no longer exists.');
-            $audit = ['timestamp' => gmdate('c'), 'administrator' => $this->adminId(), 'action' => 'deleteTemplate', 'template' => $id];
+            $audit = [
+                'timestamp' => gmdate('c'),
+                'administrator' => $this->adminId(),
+                'action' => 'deleteTemplate',
+                'template' => $id,
+            ];
             $this->audit($audit + ['result' => 'attempt']);
             $this->storeTemplates($filtered);
             $this->audit($audit + ['result' => 'success']);
             return ['deleted' => true];
-        } finally { $this->unlock($lock); }
+        } finally {
+            $this->unlock($lock);
+        }
     }
 
     /** Create local users through the auth backend, never by editing users.auth.php. */
     public function createUser(
-        string $id, string $name, string $email, array $groups,
-        string $passwordMode = 'generate', string $chosenPassword = '', string $passwordConfirmation = ''
-    ): array
-    {
+        string $id,
+        string $name,
+        string $email,
+        array $groups,
+        string $passwordMode = 'generate',
+        string $chosenPassword = '',
+        string $passwordConfirmation = ''
+    ): array {
         $this->assertSuperuser();
         $backend = $this->backend();
         if (!$backend || !$backend->canDo('getUsers') || !$backend->canDo('addUser') || !$backend->canDo('modGroups')) {
             throw new RuntimeException('Authentication backend does not support local onboarding.');
         }
         if (!preg_match('/^[a-z0-9][a-z0-9_.-]{1,63}$/D', $id) || $backend->cleanUser($id) !== $id) {
-            throw new InvalidArgumentException('Username must be 2–64 lowercase letters, digits, underscore, dot or dash.');
+            throw new InvalidArgumentException(
+                'Username must be 2–64 lowercase letters, digits, underscore, dot or dash.'
+            );
         }
         $name = trim($name);
         $email = trim($email);
@@ -590,8 +690,10 @@ class helper_plugin_groupmanager extends Plugin
         }
         if ($passwordMode === 'manual') {
             // Check the exact supplied password; never trim, normalize, log, or echo it.
-            if (strlen($chosenPassword) < 8 || strlen($chosenPassword) > 72 ||
-                trim($chosenPassword) === '' || preg_match('/[\x00-\x1f\x7f]/', $chosenPassword)) {
+            if (
+                strlen($chosenPassword) < 8 || strlen($chosenPassword) > 72 ||
+                trim($chosenPassword) === '' || preg_match('/[\x00-\x1f\x7f]/', $chosenPassword)
+            ) {
                 throw new InvalidArgumentException('Password must be 8–72 bytes and contain no control characters.');
             }
             if (!hash_equals($chosenPassword, $passwordConfirmation)) {
@@ -608,9 +710,18 @@ class helper_plugin_groupmanager extends Plugin
         $lock = $this->lock();
         try {
             $available = array_column($this->directoryData()['groups'], 'name');
-            if (array_diff($groups, $available)) throw new InvalidArgumentException('Unknown onboarding group. Reload the directory.');
-            if (array_intersect(array_map('strtolower', $groups), array_map('strtolower', $this->protectedGroups()))) {
-                throw new InvalidArgumentException('Assign privileged groups separately using temporary override after creating the user.');
+            if (array_diff($groups, $available)) {
+                throw new InvalidArgumentException('Unknown onboarding group. Reload the directory.');
+            }
+            if (
+                array_intersect(
+                    array_map(strtolower(...), $groups),
+                    array_map(strtolower(...), $this->protectedGroups())
+                )
+            ) {
+                throw new InvalidArgumentException(
+                    'Assign privileged groups separately using temporary override after creating the user.'
+                );
             }
             if ($backend->getUserData($id) !== false) throw new RuntimeException('Username already exists.');
             // 16 URL-safe characters (96 bits) for generated accounts, or a validated chosen password.
@@ -626,17 +737,26 @@ class helper_plugin_groupmanager extends Plugin
             $verified = is_array($new) && $this->normalizeGroups($new['grps'] ?? []) === $groups;
             if (!$created || !$verified) {
                 $this->audit($record + ['result' => 'failed', 'created' => (bool) $created, 'verified' => $verified]);
-                throw new RuntimeException($created ? 'Account may have been created, but group verification failed. Check Classic User Manager before retrying.' : 'Backend rejected account creation.');
+                $message = $created
+                    ? 'Account may have been created, but group verification failed. ' .
+                        'Check Classic User Manager before retrying.'
+                    : 'Backend rejected account creation.';
+                throw new RuntimeException($message);
             }
             $warning = '';
-            try { $this->audit($record + ['result' => 'success']); }
-            catch (Throwable $e) { $warning = 'Audit completion entry could not be written; intent entry exists.'; }
+            try {
+                $this->audit($record + ['result' => 'success']);
+            } catch (Throwable) {
+                $warning = 'Audit completion entry could not be written; intent entry exists.';
+            }
             if (!@io_saveFile(rtrim($conf['cachedir'], '/\\') . '/sessionpurge', (string) time())) {
                 $warning .= ' Session invalidation marker could not be updated.';
             }
             $result = ['id' => $id, 'name' => $name, 'passwordMode' => $passwordMode, 'warning' => trim($warning)];
             if ($passwordMode === 'generate') $result['temporaryPassword'] = $password;
             return $result;
-        } finally { $this->unlock($lock); }
+        } finally {
+            $this->unlock($lock);
+        }
     }
 }

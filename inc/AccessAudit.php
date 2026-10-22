@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Read-only inventory and diagnostics for the DokuWiki ACL file.
  *
@@ -7,6 +8,7 @@
  *
  * @license GPL-2.0-or-later
  */
+
 namespace dokuwiki\plugin\groupmanager;
 
 use RuntimeException;
@@ -57,8 +59,10 @@ final class AccessAudit
     {
         global $conf;
         $base = $conf['datadir'] ?? '';
-        if (!is_string($base) || !$base || str_contains($name, '/') ||
-            str_contains($name, '\\') || str_contains($name, '..') || str_contains($name, '%')) {
+        if (
+            !is_string($base) || !$base || str_contains($name, '/') ||
+            str_contains($name, '\\') || str_contains($name, '..') || str_contains($name, '%')
+        ) {
             return false;
         }
         $encoded = function_exists('utf8_encodeFN') ? utf8_encodeFN($name) : $name;
@@ -132,8 +136,10 @@ final class AccessAudit
                     ];
                 }
                 $entries[$key]['ruleCount'] = ($entries[$key]['ruleCount'] ?? 0) + 1;
-                if ($scope === $root['name'] ||
-                    ($root['kind'] === 'namespace' && $scope === $root['name'] . ':*')) {
+                if (
+                    $scope === $root['name'] ||
+                    ($root['kind'] === 'namespace' && $scope === $root['name'] . ':*')
+                ) {
                     $entries[$key]['directRuleCount'] = ($entries[$key]['directRuleCount'] ?? 0) + 1;
                 }
             }
@@ -170,8 +176,8 @@ final class AccessAudit
         unset($group);
         uasort($groups, static fn($a, $b) => strnatcasecmp($a['name'], $b['name']));
         foreach ($entries as &$entry) {
-            $entry['ruleCount'] = $entry['ruleCount'] ?? 0;
-            $entry['directRuleCount'] = $entry['directRuleCount'] ?? 0;
+            $entry['ruleCount'] ??= 0;
+            $entry['directRuleCount'] ??= 0;
         }
         unset($entry);
         uasort($entries, static function ($a, $b) {
@@ -182,14 +188,16 @@ final class AccessAudit
         foreach ($rootGrants as $rule) {
             $findings[] = ['type' => 'Root-level edit grant', 'severity' => 'review',
                 'title' => $rule['principal'] . ' receives ' . $this->permissionName($rule['level']) . ' at wiki root',
-                'detail' => 'Broad default permission; review whether more specific namespaces should carry this access.',
+                'detail' => 'Broad default permission; review whether more specific namespaces ' .
+                    'should carry this access.',
                 'line' => $rule['line']];
         }
         foreach ($groups as $group) {
             if ($group['members'] === 0 && $group['references'] > 0) {
                 $findings[] = ['type' => 'Empty ACL group', 'severity' => 'info',
                     'title' => '@' . $group['name'] . ' has no current members',
-                    'detail' => 'May be an intentionally reserved or temporarily unused role. Keep until its purpose is confirmed.',
+                    'detail' => 'May be an intentionally reserved or temporarily unused role. ' .
+                        'Keep until its purpose is confirmed.',
                     'line' => ($groupRules[$group['name']][0]['line'] ?? 0)];
             }
         }
@@ -204,20 +212,25 @@ final class AccessAudit
             if (!isset($users[$group['name']]) || $group['members'] > 0) continue;
             $findings[] = ['type' => 'Account/group name collision', 'severity' => 'info',
                 'title' => $group['name'] . ' (account) and @' . $group['name'] . ' (group) are separate',
-                'detail' => 'An account with this login exists but is not a member of the matching group. This may be intentional for service accounts.',
+                'detail' => 'An account with this login exists but is not a member of the matching group. ' .
+                    'This may be intentional for service accounts.',
                 'line' => 0];
         }
         $groupNames = array_keys($groups);
-        for ($i = 0; $i < count($groupNames); $i++) {
+        $counter = count($groupNames);
+        for ($i = 0; $i < $counter; $i++) {
             for ($j = $i + 1; $j < count($groupNames); $j++) {
                 $a = $groupNames[$i];
                 $b = $groupNames[$j];
-                if (strlen($a) < 5 || strlen($b) < 5 ||
+                if (
+                    strlen($a) < 5 || strlen($b) < 5 ||
                     strtolower($a) === strtolower($b) ||
-                    levenshtein(strtolower($a), strtolower($b)) > 2) continue;
+                    levenshtein(strtolower($a), strtolower($b)) > 2
+                ) continue;
                 $findings[] = ['type' => 'Similar group names', 'severity' => 'info',
                     'title' => '@' . $a . ' and @' . $b,
-                    'detail' => 'Check whether these intentionally represent different roles before consolidating or renaming either group.',
+                    'detail' => 'Check whether these intentionally represent different roles before consolidating ' .
+                        'or renaming either group.',
                     'line' => 0];
             }
         }
@@ -226,14 +239,16 @@ final class AccessAudit
             $first = $same[0];
             $findings[] = ['type' => 'Duplicate ACL scope/principal', 'severity' => 'review',
                 'title' => $first['scope'] . ' / ' . $first['principal'] . ' occurs ' . count($same) . ' times',
-                'detail' => 'Multiple rules for the same scope and principal; check for redundant or conflicting levels.',
+                'detail' => 'Multiple rules for the same scope and principal; ' .
+                    'check for redundant or conflicting levels.',
                 'line' => $first['line']];
         }
         foreach ($entries as $entry) {
             if ($entry['onDisk'] || $entry['ruleCount'] === 0) continue;
             $findings[] = ['type' => 'ACL-only root entry', 'severity' => 'info',
                 'title' => $entry['name'] . ' (' . $entry['kind'] . ')',
-                'detail' => 'Referenced in ACL, but no matching root page/folder on disk. May be virtual, planned, moved or obsolete.',
+                'detail' => 'Referenced in ACL, but no matching root page/folder on disk. ' .
+                    'May be virtual, planned, moved or obsolete.',
                 'line' => 0];
         }
         return [
@@ -243,7 +258,9 @@ final class AccessAudit
             'groups' => array_values($groups),
             'entries' => array_values($entries),
             'findings' => $findings,
-            'notice' => 'Read-only ACL inventory. Permission names are cumulative (Upload includes Create, Edit and Read). Rules shown for a group are written ACL entries, not necessarily the effective access of its members. Use Permissions to inspect users.',
+            'notice' => 'Read-only ACL inventory. Permission names are cumulative ' .
+                '(Upload includes Create, Edit and Read). Rules shown for a group are written ACL entries, ' .
+                'not necessarily the effective access of its members. Use Permissions to inspect users.',
         ];
     }
 }

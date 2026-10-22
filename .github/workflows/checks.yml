@@ -1,7 +1,11 @@
 name: Group Manager checks
 on:
   push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -17,8 +21,8 @@ jobs:
           node --check audit.js
       - name: PHP smoke tests
         run: |
-          php tests/smoke.php
-          php tests/acl_explorer.php
-          php tests/access_audit.php
+          php _test/smoke.php
+          php _test/acl_explorer.php
+          php _test/access_audit.php
       - name: Navigation smoke tests
-        run: node tests/navigation.js
+        run: node _test/navigation.js
