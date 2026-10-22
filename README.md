@@ -122,18 +122,18 @@ These files are deliberately **not removed** by uninstalling the plugin; preserv
 - `script.js`: interactive UI and Classic User Manager link
 - `style.css`: scoped responsive Bootstrap3 styling
 - `lang/en/lang.php`, `admin.svg`, `plugin.info.txt`: plugin metadata
-- `_test/smoke.php`: CLI-only mock-backend tests (source ZIP/repo only)
-- `_test/acl_explorer.php`: CLI-only ACL-specific diagnostics tests (source ZIP/repo only)
-- `_test/access_audit.php`: CLI-only audit smoke tests (source ZIP/repo only)
+- `tests/smoke.php`: CLI-only mock-backend tests (source ZIP/repo only)
+- `tests/acl_explorer.php`: CLI-only ACL-specific diagnostics tests (source ZIP/repo only)
+- `tests/access_audit.php`: CLI-only audit smoke tests (source ZIP/repo only)
 
 For local checks:
 
 ```bash
 php -l admin.php && php -l action.php && php -l helper.php && php -l inc/AclExplorer.php && php -l inc/AccessAudit.php
 node --check script.js && node --check audit.js
-php _test/smoke.php
-php _test/acl_explorer.php
-php _test/access_audit.php
+php tests/smoke.php
+php tests/acl_explorer.php
+php tests/access_audit.php
 ```
 
 The mock tests do **not** replace browser tests against your real DokuWiki release, permission configuration, ACL event extensions, email policy or PHP-FPM environment.
