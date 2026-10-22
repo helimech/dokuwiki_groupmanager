@@ -2,26 +2,13 @@
 
 /** Offline ACL explorer smoke tests: php tests/acl_explorer.php */
 
-namespace { if (PHP_SAPI !== 'cli') {
-        http_response_code(403);
-        exit;
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit;
 }
-}
-namespace dokuwiki\Extension {
-    class AuthPlugin
-    {
-        public $users = [];
-        public function getUserData($id)
-        {
-            return $this->users[$id] ?? false;
-        }
-        public function isCaseSensitive()
-        {
-            return true;
-        }
-    }
-}
-namespace {
+
+require_once __DIR__ . '/stubs/AuthPlugin.php';
+
     function checkAcl(bool $condition, string $message): void
     {
         if (!$condition) throw new RuntimeException('ACL test: ' . $message);
@@ -156,4 +143,3 @@ namespace {
     }
     checkAcl($AUTH_ACL === ['ORIGINAL GLOBAL'], 'global ACL not restored after explanations');
     echo "PASS: ACL tree, empty scopes, native resolution, provenance, precedence, wildcard expansion, superuser, validation, global restoration\n";
-}
