@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Membership service for the DokuWiki Group Manager plugin.
  * @license GPL-2.0-or-later
@@ -138,7 +139,7 @@ class helper_plugin_groupmanager extends Plugin
     {
         global $conf;
         $v = $conf[$key] ?? '';
-        if (is_array($v)) return array_values(array_filter($v, 'is_string'));
+        if (is_array($v)) return array_values(array_filter($v, is_string(...)));
         if (!is_string($v)) return [];
         return preg_split('/[\s,;]+/', trim($v), -1, PREG_SPLIT_NO_EMPTY) ?: [];
     }
@@ -149,7 +150,7 @@ class helper_plugin_groupmanager extends Plugin
         $names = ['admin', 'manager'];
         foreach (['superuser', 'manager'] as $key) {
             foreach ($this->configuredEntries($key) as $entry) {
-                if (strpos($entry, '@') === 0 && strlen($entry) > 1) {
+                if (str_starts_with($entry, '@') && strlen($entry) > 1) {
                     $names[] = substr($entry, 1);
                 }
             }
@@ -251,19 +252,19 @@ class helper_plugin_groupmanager extends Plugin
                 'count' => $counts[$name] ?? 0,
                 'registered' => in_array($name, $registered, true),
                 'referencedByAcl' => in_array($name, $aclNames, true),
-                'forgettable' => $name !== ($conf['defaultgroup'] ?? '') && !in_array(strtolower($name), array_map('strtolower', $protected), true),
-                'protected' => in_array(strtolower($name), array_map('strtolower', $protected), true),
+                'forgettable' => $name !== ($conf['defaultgroup'] ?? '') && !in_array(strtolower($name), array_map(strtolower(...), $protected), true),
+                'protected' => in_array(strtolower($name), array_map(strtolower(...), $protected), true),
             ];
         }
         usort($users, static fn($a, $b) => strnatcasecmp($a['name'], $b['name']) ?: strnatcasecmp($a['id'], $b['id']));
         return [
             'supported' => true,
             'writable' => (bool) $backend->canDo('modGroups'),
-            'canCreate' => (bool) ($backend->canDo('addUser') && $backend->canDo('modGroups')),
+            'canCreate' => $backend->canDo('addUser') && $backend->canDo('modGroups'),
             'defaultGroup' => (string) ($conf['defaultgroup'] ?? ''),
             'self' => $this->adminId(),
             'templates' => $this->templates(),
-            'backend' => get_class($backend),
+            'backend' => $backend::class,
             'users' => $users,
             'groups' => $groups,
         ];
@@ -341,9 +342,9 @@ class helper_plugin_groupmanager extends Plugin
                     $current = $this->normalizeGroups($info['grps'] ?? []);
                     if ($before !== $current) throw new RuntimeException('Conflict: memberships changed since you loaded them. Refresh and review.');
                     if (array_diff($after, $available)) throw new RuntimeException('Unknown group. Refresh the group list.');
-                    $privileged = array_map('strtolower', $protectedGroups);
+                    $privileged = array_map(strtolower(...), $protectedGroups);
                     $changedGroups = array_merge(array_diff($before, $after), array_diff($after, $before));
-                    if (array_intersect($privileged, array_map('strtolower', $changedGroups))) {
+                    if (array_intersect($privileged, array_map(strtolower(...), $changedGroups))) {
                         if (!$override) throw new RuntimeException('Privileged group changes require temporary override.');
                         if ($id === $this->adminId()) throw new RuntimeException('Cannot modify your own privileged memberships.');
                         if ($this->wouldRemoveLastSuperuser($backend, $id, $after)) {
@@ -373,7 +374,7 @@ class helper_plugin_groupmanager extends Plugin
                         try {
                             $this->audit($record + ['result' => 'success']);
                             $entry = ['user' => $id, 'ok' => true, 'message' => 'Saved.'];
-                        } catch (Throwable $auditError) {
+                        } catch (Throwable) {
                             $warnings[] = 'Audit completion record failed for ' . $id . '; an intent record was written.';
                             $entry = ['user' => $id, 'ok' => true, 'message' => 'Saved, but audit completion record failed.'];
                         }
@@ -434,7 +435,7 @@ class helper_plugin_groupmanager extends Plugin
             $registry = $this->registry();
             if (!in_array($name, $registry, true)) throw new RuntimeException('Group is not registered.');
             global $conf;
-            if ($name === ($conf['defaultgroup'] ?? '') || in_array(strtolower($name), array_map('strtolower', $this->protectedGroups()), true)) {
+            if ($name === ($conf['defaultgroup'] ?? '') || in_array(strtolower($name), array_map(strtolower(...), $this->protectedGroups()), true)) {
                 throw new RuntimeException('Cannot forget a required or privileged group.');
             }
             foreach ($this->templates() as $template) {
@@ -468,8 +469,10 @@ class helper_plugin_groupmanager extends Plugin
             $id = (string) $id;
             $groups = $id === $target ? $replacement : ($info['grps'] ?? []);
             foreach ($rules as $rule) {
-                if (($rule !== '' && $rule[0] !== '@' && $rule === $id) ||
-                    ($rule !== '' && $rule[0] === '@' && in_array(substr($rule, 1), $groups, true))) {
+                if (
+                    ($rule !== '' && $rule[0] !== '@' && $rule === $id) ||
+                    ($rule !== '' && $rule[0] === '@' && in_array(substr($rule, 1), $groups, true))
+                ) {
                     $remaining++;
                     break;
                 }
@@ -493,9 +496,11 @@ class helper_plugin_groupmanager extends Plugin
         $items = [];
         $seen = [];
         foreach ($decoded['templates'] as $value) {
-            if (!is_array($value) || !isset($value['id'], $value['name'], $value['groups']) ||
+            if (
+                !is_array($value) || !isset($value['id'], $value['name'], $value['groups']) ||
                 !is_string($value['id']) || !preg_match('/^[a-z][a-z0-9_-]{0,63}$/D', $value['id']) ||
-                !is_string($value['name']) || !is_array($value['groups']) || isset($seen[$value['id']])) {
+                !is_string($value['name']) || !is_array($value['groups']) || isset($seen[$value['id']])
+            ) {
                 throw new RuntimeException('Invalid template entry.');
             }
             $seen[$value['id']] = true;
@@ -533,24 +538,30 @@ class helper_plugin_groupmanager extends Plugin
         try {
             $available = array_column($this->directoryData()['groups'], 'name');
             if (array_diff($groups, $available)) throw new InvalidArgumentException('Template contains unknown group(s).');
-            if (array_intersect(array_map('strtolower', $groups), array_map('strtolower', $this->protectedGroups()))) {
+            if (array_intersect(array_map(strtolower(...), $groups), array_map(strtolower(...), $this->protectedGroups()))) {
                 throw new InvalidArgumentException('Privileged groups cannot be included in reusable templates.');
             }
             $items = $this->templates();
             if ($id === '') $id = 'r_' . bin2hex(random_bytes(8));
             $found = false;
             foreach ($items as &$item) {
-                if ($item['id'] === $id) { $item = compact('id', 'name', 'groups'); $found = true; break; }
+                if ($item['id'] === $id) {
+                    $item = ['id' => $id, 'name' => $name, 'groups' => $groups];
+                    $found = true;
+                    break;
+                }
             }
             unset($item);
-            if (!$found) $items[] = compact('id', 'name', 'groups');
+            if (!$found) $items[] = ['id' => $id, 'name' => $name, 'groups' => $groups];
             $audit = ['timestamp' => gmdate('c'), 'administrator' => $this->adminId(),
                       'action' => 'saveTemplate', 'template' => $id, 'name' => $name, 'groups' => $groups];
             $this->audit($audit + ['result' => 'attempt']);
             $this->storeTemplates($items);
             $this->audit($audit + ['result' => 'success']);
             return ['id' => $id];
-        } finally { $this->unlock($lock); }
+        } finally {
+            $this->unlock($lock);
+        }
     }
 
     public function deleteTemplate(string $id): array
@@ -566,15 +577,21 @@ class helper_plugin_groupmanager extends Plugin
             $this->storeTemplates($filtered);
             $this->audit($audit + ['result' => 'success']);
             return ['deleted' => true];
-        } finally { $this->unlock($lock); }
+        } finally {
+            $this->unlock($lock);
+        }
     }
 
     /** Create local users through the auth backend, never by editing users.auth.php. */
     public function createUser(
-        string $id, string $name, string $email, array $groups,
-        string $passwordMode = 'generate', string $chosenPassword = '', string $passwordConfirmation = ''
-    ): array
-    {
+        string $id,
+        string $name,
+        string $email,
+        array $groups,
+        string $passwordMode = 'generate',
+        string $chosenPassword = '',
+        string $passwordConfirmation = ''
+    ): array {
         $this->assertSuperuser();
         $backend = $this->backend();
         if (!$backend || !$backend->canDo('getUsers') || !$backend->canDo('addUser') || !$backend->canDo('modGroups')) {
@@ -590,8 +607,10 @@ class helper_plugin_groupmanager extends Plugin
         }
         if ($passwordMode === 'manual') {
             // Check the exact supplied password; never trim, normalize, log, or echo it.
-            if (strlen($chosenPassword) < 8 || strlen($chosenPassword) > 72 ||
-                trim($chosenPassword) === '' || preg_match('/[\x00-\x1f\x7f]/', $chosenPassword)) {
+            if (
+                strlen($chosenPassword) < 8 || strlen($chosenPassword) > 72 ||
+                trim($chosenPassword) === '' || preg_match('/[\x00-\x1f\x7f]/', $chosenPassword)
+            ) {
                 throw new InvalidArgumentException('Password must be 8–72 bytes and contain no control characters.');
             }
             if (!hash_equals($chosenPassword, $passwordConfirmation)) {
@@ -609,7 +628,7 @@ class helper_plugin_groupmanager extends Plugin
         try {
             $available = array_column($this->directoryData()['groups'], 'name');
             if (array_diff($groups, $available)) throw new InvalidArgumentException('Unknown onboarding group. Reload the directory.');
-            if (array_intersect(array_map('strtolower', $groups), array_map('strtolower', $this->protectedGroups()))) {
+            if (array_intersect(array_map(strtolower(...), $groups), array_map(strtolower(...), $this->protectedGroups()))) {
                 throw new InvalidArgumentException('Assign privileged groups separately using temporary override after creating the user.');
             }
             if ($backend->getUserData($id) !== false) throw new RuntimeException('Username already exists.');
@@ -629,14 +648,19 @@ class helper_plugin_groupmanager extends Plugin
                 throw new RuntimeException($created ? 'Account may have been created, but group verification failed. Check Classic User Manager before retrying.' : 'Backend rejected account creation.');
             }
             $warning = '';
-            try { $this->audit($record + ['result' => 'success']); }
-            catch (Throwable $e) { $warning = 'Audit completion entry could not be written; intent entry exists.'; }
+            try {
+                $this->audit($record + ['result' => 'success']);
+            } catch (Throwable) {
+                $warning = 'Audit completion entry could not be written; intent entry exists.';
+            }
             if (!@io_saveFile(rtrim($conf['cachedir'], '/\\') . '/sessionpurge', (string) time())) {
                 $warning .= ' Session invalidation marker could not be updated.';
             }
             $result = ['id' => $id, 'name' => $name, 'passwordMode' => $passwordMode, 'warning' => trim($warning)];
             if ($passwordMode === 'generate') $result['temporaryPassword'] = $password;
             return $result;
-        } finally { $this->unlock($lock); }
+        } finally {
+            $this->unlock($lock);
+        }
     }
 }
