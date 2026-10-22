@@ -1,8 +1,8 @@
 <?php
 
-use dokuwiki\plugin\groupmanager\AccessAudit;
-
 /** Offline read-only audit smoke tests. Run: php tests/access_audit.php */
+
+use dokuwiki\plugin\groupmanager\AccessAudit;
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
