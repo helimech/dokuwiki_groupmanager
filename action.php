@@ -52,7 +52,9 @@ class action_plugin_groupmanager extends ActionPlugin
                     break;
                 case 'save':
                     $edits = json_decode($INPUT->str('edits'), true, 512, JSON_THROW_ON_ERROR);
-                    if (!is_array($edits) || !array_is_list($edits)) throw new InvalidArgumentException('Invalid edit list.');
+                    if (!is_array($edits) || !array_is_list($edits)) {
+                        throw new InvalidArgumentException('Invalid edit list.');
+                    }
                     $override = $INPUT->str('privileged_override') === '1';
                     if ($override && $INPUT->str('override_confirmation') !== 'PRIVILEGED') {
                         throw new InvalidArgumentException('Privileged override confirmation missing.');
@@ -61,7 +63,9 @@ class action_plugin_groupmanager extends ActionPlugin
                     break;
                 case 'saveTemplate':
                     $groups = json_decode($INPUT->str('groups'), true, 512, JSON_THROW_ON_ERROR);
-                    if (!is_array($groups) || !array_is_list($groups)) throw new InvalidArgumentException('Invalid template groups.');
+                    if (!is_array($groups) || !array_is_list($groups)) {
+                        throw new InvalidArgumentException('Invalid template groups.');
+                    }
                     $result = $helper->saveTemplate($INPUT->str('id'), $INPUT->str('name'), $groups);
                     break;
                 case 'deleteTemplate':
@@ -69,7 +73,9 @@ class action_plugin_groupmanager extends ActionPlugin
                     break;
                 case 'createUser':
                     $groups = json_decode($INPUT->str('groups'), true, 512, JSON_THROW_ON_ERROR);
-                    if (!is_array($groups) || !array_is_list($groups)) throw new InvalidArgumentException('Invalid membership list.');
+                    if (!is_array($groups) || !array_is_list($groups)) {
+                        throw new InvalidArgumentException('Invalid membership list.');
+                    }
                     $result = $helper->createUser(
                         $INPUT->str('username'),
                         $INPUT->str('name'),
