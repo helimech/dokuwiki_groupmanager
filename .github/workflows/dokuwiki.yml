@@ -1,9 +1,6 @@
 name: DokuWiki Default Tasks
 on:
-  push:
-  pull_request:
-  schedule:
-    - cron: '0 5 1 * *'
+  workflow_dispatch:
 
 permissions: write-all
 
