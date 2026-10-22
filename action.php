@@ -1,5 +1,10 @@
 <?php
+
 /** AJAX controller for Group Manager. @license GPL-2.0-or-later */
+
+use dokuwiki\Extension\AuthPlugin;
+use dokuwiki\plugin\groupmanager\AccessAudit;
+use dokuwiki\plugin\groupmanager\AclExplorer;
 use dokuwiki\Extension\ActionPlugin;
 use dokuwiki\Extension\Event;
 use dokuwiki\Extension\EventHandler;
@@ -66,23 +71,28 @@ class action_plugin_groupmanager extends ActionPlugin
                     $groups = json_decode($INPUT->str('groups'), true, 512, JSON_THROW_ON_ERROR);
                     if (!is_array($groups) || !array_is_list($groups)) throw new InvalidArgumentException('Invalid membership list.');
                     $result = $helper->createUser(
-                        $INPUT->str('username'), $INPUT->str('name'), $INPUT->str('email'), $groups,
-                        $INPUT->str('password_mode', 'generate'), $INPUT->str('password'), $INPUT->str('password_confirm')
+                        $INPUT->str('username'),
+                        $INPUT->str('name'),
+                        $INPUT->str('email'),
+                        $groups,
+                        $INPUT->str('password_mode', 'generate'),
+                        $INPUT->str('password'),
+                        $INPUT->str('password_confirm')
                     );
                     break;
                 case 'accessAudit':
                     global $auth, $conf;
-                    if (!($auth instanceof \dokuwiki\Extension\AuthPlugin) || empty($conf['useacl'])) {
+                    if (!($auth instanceof AuthPlugin) || empty($conf['useacl'])) {
                         throw new RuntimeException('DokuWiki ACLs are disabled or authentication is unavailable.');
                     }
                     require_once __DIR__ . '/inc/AccessAudit.php';
-                    $audit = new \dokuwiki\plugin\groupmanager\AccessAudit();
+                    $audit = new AccessAudit();
                     $result = $audit->summary($helper->directoryData());
                     break;
                 case 'aclTree':
                 case 'aclExplain':
                     global $auth, $conf;
-                    if (!($auth instanceof \dokuwiki\Extension\AuthPlugin) || empty($conf['useacl'])) {
+                    if (!($auth instanceof AuthPlugin) || empty($conf['useacl'])) {
                         throw new RuntimeException('DokuWiki ACLs are disabled or authentication is unavailable.');
                     }
                     $kind = $INPUT->str('principalType');
@@ -94,7 +104,7 @@ class action_plugin_groupmanager extends ActionPlugin
                         }
                     }
                     require_once __DIR__ . '/inc/AclExplorer.php';
-                    $explorer = new \dokuwiki\plugin\groupmanager\AclExplorer($auth);
+                    $explorer = new AclExplorer($auth);
                     if ($action === 'aclTree') {
                         $result = $explorer->tree($kind, $principal, $INPUT->str('parent'));
                     } else {

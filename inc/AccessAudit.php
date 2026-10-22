@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Read-only inventory and diagnostics for the DokuWiki ACL file.
  *
@@ -7,6 +8,7 @@
  *
  * @license GPL-2.0-or-later
  */
+
 namespace dokuwiki\plugin\groupmanager;
 
 use RuntimeException;
@@ -57,8 +59,10 @@ final class AccessAudit
     {
         global $conf;
         $base = $conf['datadir'] ?? '';
-        if (!is_string($base) || !$base || str_contains($name, '/') ||
-            str_contains($name, '\\') || str_contains($name, '..') || str_contains($name, '%')) {
+        if (
+            !is_string($base) || !$base || str_contains($name, '/') ||
+            str_contains($name, '\\') || str_contains($name, '..') || str_contains($name, '%')
+        ) {
             return false;
         }
         $encoded = function_exists('utf8_encodeFN') ? utf8_encodeFN($name) : $name;
@@ -132,8 +136,10 @@ final class AccessAudit
                     ];
                 }
                 $entries[$key]['ruleCount'] = ($entries[$key]['ruleCount'] ?? 0) + 1;
-                if ($scope === $root['name'] ||
-                    ($root['kind'] === 'namespace' && $scope === $root['name'] . ':*')) {
+                if (
+                    $scope === $root['name'] ||
+                    ($root['kind'] === 'namespace' && $scope === $root['name'] . ':*')
+                ) {
                     $entries[$key]['directRuleCount'] = ($entries[$key]['directRuleCount'] ?? 0) + 1;
                 }
             }
@@ -170,8 +176,8 @@ final class AccessAudit
         unset($group);
         uasort($groups, static fn($a, $b) => strnatcasecmp($a['name'], $b['name']));
         foreach ($entries as &$entry) {
-            $entry['ruleCount'] = $entry['ruleCount'] ?? 0;
-            $entry['directRuleCount'] = $entry['directRuleCount'] ?? 0;
+            $entry['ruleCount'] ??= 0;
+            $entry['directRuleCount'] ??= 0;
         }
         unset($entry);
         uasort($entries, static function ($a, $b) {
@@ -208,13 +214,16 @@ final class AccessAudit
                 'line' => 0];
         }
         $groupNames = array_keys($groups);
-        for ($i = 0; $i < count($groupNames); $i++) {
+        $counter = count($groupNames);
+        for ($i = 0; $i < $counter; $i++) {
             for ($j = $i + 1; $j < count($groupNames); $j++) {
                 $a = $groupNames[$i];
                 $b = $groupNames[$j];
-                if (strlen($a) < 5 || strlen($b) < 5 ||
+                if (
+                    strlen($a) < 5 || strlen($b) < 5 ||
                     strtolower($a) === strtolower($b) ||
-                    levenshtein(strtolower($a), strtolower($b)) > 2) continue;
+                    levenshtein(strtolower($a), strtolower($b)) > 2
+                ) continue;
                 $findings[] = ['type' => 'Similar group names', 'severity' => 'info',
                     'title' => '@' . $a . ' and @' . $b,
                     'detail' => 'Check whether these intentionally represent different roles before consolidating or renaming either group.',

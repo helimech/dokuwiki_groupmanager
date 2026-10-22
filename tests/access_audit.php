@@ -1,10 +1,27 @@
 <?php
+
+use dokuwiki\plugin\groupmanager\AccessAudit;
+
 /** Offline read-only audit smoke tests. Run: php tests/access_audit.php */
-if (PHP_SAPI !== 'cli') { http_response_code(403); exit; }
-function auth_isadmin() { return true; }
-function utf8_encodeFN($s) { return $s; }
-function utf8_decodeFN($s) { return $s; }
-function checkAudit($condition, $label) {
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit;
+}
+function auth_isadmin()
+{
+    return true;
+}
+function utf8_encodeFN($s)
+{
+    return $s;
+}
+function utf8_decodeFN($s)
+{
+    return $s;
+}
+function checkAudit($condition, $label)
+{
     if (!$condition) throw new RuntimeException('Access Audit: ' . $label);
 }
 $temp = sys_get_temp_dir() . '/groupmanager-audit-' . bin2hex(random_bytes(5));
@@ -28,7 +45,7 @@ $conf = ['datadir' => $temp . '/pages'];
 $config_cascade = ['acl' => ['default' => $acl]];
 require_once dirname(__DIR__) . '/inc/AccessAudit.php';
 try {
-    $audit = new \dokuwiki\plugin\groupmanager\AccessAudit();
+    $audit = new AccessAudit();
     $result = $audit->summary([
         'users' => [['id' => 'forms', 'name' => 'Service', 'groups' => ['admin']]],
         'groups' => [
@@ -40,19 +57,25 @@ try {
     $groups = array_column($result['groups'], null, 'name');
     checkAudit($result['totals']['rules'] === 9, 'counts actual ACL rules');
     checkAudit($groups['contract']['members'] === 0, 'keeps empty reserved contractor group');
-    checkAudit($groups['forms']['members'] === 0 && $groups['forms']['references'] === 1,
-        'distinguishes forms service account from @forms group');
+    checkAudit(
+        $groups['forms']['members'] === 0 && $groups['forms']['references'] === 1,
+        'distinguishes forms service account from @forms group'
+    );
     checkAudit($groups['wip']['references'] === 3, 'counts ACL usage for working group');
     checkAudit(count($groups['wip']['scopeRules']) === 3, 'lists each ACL rule with its permission');
     checkAudit($groups['wip']['scopeRules'][0]['permission'] === 'Edit', 'labels level 2 Edit');
     checkAudit($groups['wip']['scopeRules'][1]['scope'] === 'wip:*'
         && $groups['wip']['scopeRules'][1]['permission'] === 'Upload', 'labels level 8 Upload');
     checkAudit($groups['contract']['scopeRules'][0]['permission'] === 'Read', 'labels level 1 Read');
-    $broadRoot = array_values(array_filter($result['findings'],
-        static fn($finding) => $finding['type'] === 'Root-level edit grant'));
+    $broadRoot = array_values(array_filter(
+        $result['findings'],
+        static fn($finding) => $finding['type'] === 'Root-level edit grant'
+    ));
     checkAudit(count($broadRoot) === 2, 'identifies broad root rules');
-    checkAudit(str_contains($broadRoot[0]['title'], 'receives Upload at wiki root'),
-        'diagnostics use the permission name instead of numeric 8');
+    checkAudit(
+        str_contains($broadRoot[0]['title'], 'receives Upload at wiki root'),
+        'diagnostics use the permission name instead of numeric 8'
+    );
     $roots = [];
     foreach ($result['entries'] as $entry) $roots[$entry['kind'] . '|' . $entry['name']] = $entry;
     checkAudit($roots['namespace|wip']['onDisk'] === true, 'recognizes live namespace');

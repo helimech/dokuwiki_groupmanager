@@ -1,5 +1,7 @@
 <?php
+
 /** DokuWiki Group Manager administration page. @license GPL-2.0-or-later */
+
 use dokuwiki\Extension\AdminPlugin;
 
 class admin_plugin_groupmanager extends AdminPlugin
